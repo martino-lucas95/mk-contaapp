@@ -29,6 +29,7 @@ postgres_data/
 
 # TypeORM
 *.js.map
+*.tsbuildinfo
 
 # secret
 /k8s/secret.yaml
