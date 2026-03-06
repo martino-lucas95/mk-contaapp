@@ -1,10 +1,13 @@
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { Movimiento } from './movimiento.entity';
+import { MovementsService } from './movements.service';
+import { MovementsController } from './movements.controller';
 
-// TODO: Agregar TypeOrmModule.forFeature([...entidades]) y providers
 @Module({
-  imports: [],
-  providers: [],
-  controllers: [],
-  exports: [],
+  imports: [TypeOrmModule.forFeature([Movimiento])],
+  providers: [MovementsService],
+  controllers: [MovementsController],
+  exports: [MovementsService],
 })
 export class MovementsModule {}
