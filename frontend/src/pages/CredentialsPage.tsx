@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { clientsApi, credentialsApi } from '../services/api';
+import { useThemeStore } from '../store/theme.store';
 import { Client, Credential, PlataformaCredencial } from '../types';
 
 const PLATAFORMA_LABEL: Record<PlataformaCredencial, string> = {
@@ -26,6 +27,7 @@ const PLATAFORMA_COLOR: Record<PlataformaCredencial, string> = {
 type CredConCliente = Credential & { clienteNombre?: string; clienteId?: string };
 
 export default function CredentialsPage() {
+  const theme = useThemeStore((s) => s.theme);
   const [credentials, setCredentials] = useState<CredConCliente[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);

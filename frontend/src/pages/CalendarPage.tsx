@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { calendarApi } from '../services/api';
+import { useThemeStore } from '../store/theme.store';
 import { Vencimiento, EstadoVencimiento } from '../types';
 
 const ESTADO_COLORS: Record<EstadoVencimiento, { bg: string; color: string; dot: string }> = {
@@ -16,6 +17,7 @@ type VencimientoConCliente = Vencimiento & { clienteNombre?: string; clienteId?:
 
 export default function CalendarPage() {
   const navigate = useNavigate();
+  const theme = useThemeStore((s) => s.theme);
   const [vencimientos, setVencimientos] = useState<VencimientoConCliente[]>([]);
   const [loading, setLoading] = useState(true);
   const [filtroEstado, setFiltroEstado] = useState<EstadoVencimiento | 'todos'>('todos');
