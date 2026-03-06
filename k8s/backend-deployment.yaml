@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: contaapp-backend
+  namespace: contaapp
+  labels:
+    app: contaapp-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: contaapp-backend
+  template:
+    metadata:
+      labels:
+        app: contaapp-backend
+    spec:
+      containers:
+        - name: backend
+          image: docker.io/library/contaapp-backend:1.0.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3000
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "200m"
+            limits:
+              memory: "768Mi"
+              cpu: "500m"
+          envFrom:
+            - secretRef:
+                name: contaapp-secrets
+          readinessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 30
