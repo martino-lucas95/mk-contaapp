@@ -1,14 +1,9 @@
-FROM node:20-alpine AS base
+FROM node:20-alpine AS build
 WORKDIR /app
+ARG VITE_API_URL=https://contaapp.mkstudios.net
+ENV VITE_API_URL=$VITE_API_URL
 COPY package*.json ./
 RUN npm ci
-
-FROM base AS dev
-COPY . .
-EXPOSE 5173
-CMD ["npm", "run", "dev", "--", "--host"]
-
-FROM base AS build
 COPY . .
 RUN npm run build
 
