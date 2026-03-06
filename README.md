@@ -1,119 +1,187 @@
 # ContaApp
 
-**Sistema de Gestión Contable para Contador Independiente**  
-Progressive Web App · React + NestJS + PostgreSQL + TypeORM
+Sistema de gestión contable para contador independiente. Desarrollado con NestJS + PostgreSQL + React.
+
+**MK Studios · Lucas Martino**
 
 ---
 
-## Descripción
+## Stack
 
-ContaApp es una PWA diseñada para gestionar de forma integral la operativa de un contador independiente en Uruguay. Centraliza la información de clientes, movimientos contables, credenciales de acceso a plataformas tributarias (DGI, BPS, etc.), seguimiento de honorarios y calendario de vencimientos fiscales, actuando como asistente proactivo mediante notificaciones y recordatorios automáticos.
-
-Pensada inicialmente para uso personal, con arquitectura preparada para escalar hacia múltiples contadores (modelo SaaS).
-
----
-
-## Stack Tecnológico
-
-| Capa | Tecnología |
-|------|-----------|
-| Frontend | React + TypeScript (PWA) |
-| Backend | NestJS (Node.js) |
-| Base de Datos | PostgreSQL |
-| ORM | TypeORM |
-| Autenticación | JWT + Refresh Tokens |
-| Notificaciones | Web Push API + Email |
-| Encriptación | AES-256 (credenciales) |
-| Deploy | Docker + Docker Compose |
-| Calendario | FullCalendar (React) |
+| Capa       | Tecnología                               |
+|------------|------------------------------------------|
+| Backend    | NestJS 10 · TypeORM · PostgreSQL 16      |
+| Frontend   | React + Vite · Tailwind-free CSS         |
+| Auth       | JWT (access + refresh) · bcrypt          |
+| Crypto     | AES-256-CBC para credenciales de clientes|
+| Infra      | Docker + Docker Compose                  |
 
 ---
 
-## Roles
+## Levantar en desarrollo (recomendado)
 
-| Rol | Descripción |
-|-----|-------------|
-| **Admin** | Gestión global del sistema y usuarios |
-| **Contador** | Gestión completa de su cartera de clientes |
-| **Cliente** | Portal propio: facturación, impuestos, honorarios, consultas |
+### 1. Clonar y configurar variables
 
-> La relación `Cliente → Contador` es parte del modelo de datos desde el inicio, preparando la arquitectura multi-contador.
+```bash
+git clone https://github.com/martino-lucas95/mk-contaapp.git
+cd mk-contaapp
 
----
+cp .env.example backend/.env
+# Editá backend/.env si querés cambiar algún valor (en dev los defaults funcionan)
+```
 
-## Módulos
+### 2. Levantar con Docker Compose
 
-### MVP (v1.0)
-- Gestión de clientes (con relación al contador asignado)
-- Gestión de credenciales (DGI, BPS, facturación electrónica, CJPPU, FONASA, etc.)
-- Calendario de vencimientos tributarios (IVA, IRAE, IRPF, BPS, FONASA, CJPPU, Fondo de Solidaridad)
-- Boletos de pago — registro y seguimiento de estado
-- Honorarios — definición, cobros y estado de cuenta
-- Ventas, compras y gastos del cliente
-- Dashboard del contador
+```bash
+docker compose up -d
+```
 
-### v1.1
-- Portal del cliente (acceso propio)
-- Dashboard del cliente
-- Notificaciones push y email
-- Confirmación de pagos por el cliente
-- Carga de ventas por el cliente
+Esto levanta:
+- **PostgreSQL** en `localhost:5432`
+- **API NestJS** en `localhost:3000/api/v1`
+- **Frontend React** en `localhost:5173`
 
-### v1.2
-- Chat / consultas interno
-- Reportes en PDF/Excel
-- Importación de XML de factura electrónica
+La primera vez tarda ~2 minutos en descargar imágenes e instalar dependencias.
 
-### v2.0
-- Multi-contador (SaaS)
-- Panel de administración global
+### 3. Seed automático
 
----
+Al levantar la API en modo `development`, se ejecuta el seed automáticamente.
+También podés correrlo manualmente:
 
-## Modelo de Datos — Entidades Principales
+```bash
+cd backend
+npm run seed
+```
 
-- **Contador** — id, nombre, email, configuración
-- **Cliente** — id, contadorId *(FK)*, nombre, RUT, razón social, perfil tributario
-- **Credencial** — id, clienteId, plataforma, usuario, contraseña (encriptada)
-- **Vencimiento** — id, clienteId, tipo, fecha, estado
-- **BoletoPago** — id, clienteId, tipo impuesto, período, monto, estado
-- **Honorario** — id, clienteId, período, monto acordado, estado de cobro
-- **Movimiento** — id, clienteId, tipo (venta/compra/gasto), fecha, monto, IVA
-- **Consulta** — id, clienteId, texto, estado, respuesta
-- **Notificacion** — id, usuarioId, tipo, mensaje, leído
+### 4. Cuentas disponibles
+
+| Email                   | Contraseña | Rol       |
+|-------------------------|------------|-----------|
+| `admin@contaapp.uy`     | `admin123` | admin     |
+| `lucas@mkstudios.uy`    | `demo123`  | contador  |
+| `maria@fernandez.uy`    | `demo123`  | cliente   |
+| `roberto@pereira.uy`    | `demo123`  | cliente   |
+| `lucia@suarez.uy`       | `demo123`  | cliente   |
+| `carlos@martinez.uy`    | `demo123`  | cliente   |
 
 ---
 
-## Seguridad
+## Levantar sin Docker
 
-- Credenciales de clientes encriptadas con **AES-256**
-- Autenticación con **JWT de corta duración + refresh tokens rotatorios**
-- HTTPS obligatorio
-- Acceso estrictamente por roles
-- Log de auditoría para accesos a credenciales
-- Backups automáticos de PostgreSQL
+### Backend
+
+```bash
+cd backend
+npm install
+cp ../.env.example .env   # ajustar DB_HOST=localhost
+
+# Necesitás PostgreSQL corriendo localmente:
+createdb contaapp
+
+npm run start:dev
+```
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+---
+
+## Estructura del proyecto
+
+```
+mk-contaapp/
+├── backend/
+│   └── src/
+│       ├── common/
+│       │   ├── encryption.service.ts     # AES-256 para credenciales
+│       │   └── guards/                   # JWT + Roles
+│       ├── database/
+│       │   └── seed.ts                   # Datos iniciales
+│       └── modules/
+│           ├── auth/                     # Login, JWT, refresh tokens
+│           ├── users/                    # CRUD usuarios (solo admin)
+│           ├── clients/                  # Gestión de clientes
+│           ├── calendar/
+│           │   ├── uy-tax-calendar.ts    # ← Lógica DGI por terminal de RUT
+│           │   └── uy-tax-calendar.spec.ts
+│           ├── credentials/              # Credenciales encriptadas
+│           ├── payments/                 # Boletos de pago
+│           ├── fees/                     # Honorarios
+│           ├── movements/                # Ventas / compras / gastos
+│           └── notifications/            # Alertas en tiempo real
+└── frontend/
+    └── src/
+        └── ContaApp_Preview.jsx          # UI completa (preview)
+```
+
+---
+
+## API endpoints principales
+
+```
+POST   /api/v1/auth/login               → { accessToken, refreshToken, user }
+POST   /api/v1/auth/refresh             → nuevo accessToken
+
+GET    /api/v1/clients                  → lista de clientes del contador
+POST   /api/v1/clients                  → crear cliente
+
+GET    /api/v1/calendar/proximos        → vencimientos próximos (30 días)
+POST   /api/v1/calendar/client/:id/generar  → generar vencimientos anuales DGI
+
+GET    /api/v1/credentials/client/:id   → credenciales (sin password)
+GET    /api/v1/credentials/:id/reveal   → credencial con password desencriptada
+
+GET    /api/v1/payments/client/:id      → boletos de un cliente
+PATCH  /api/v1/payments/:id/confirmar-pago  → cliente confirma pago
+
+GET    /api/v1/fees/resumen             → resumen honorarios del contador
+PATCH  /api/v1/fees/:id/pago            → registrar pago de honorario
+
+GET    /api/v1/movements/client/:id/resumen/:periodo  → IVA débito/crédito mensual
+
+GET    /api/v1/notifications            → notificaciones del usuario logueado
+PATCH  /api/v1/notifications/read-all   → marcar todas como leídas
+```
+
+---
+
+## Roles y acceso
+
+| Funcionalidad              | admin | contador | cliente |
+|----------------------------|:-----:|:--------:|:-------:|
+| Ver todos los clientes     | ✓     | ✓ (suyos)| ✗       |
+| Crear/editar clientes      | ✓     | ✓        | ✗       |
+| Ver credenciales           | ✓     | ✓        | ✗       |
+| Generar vencimientos DGI   | ✓     | ✓        | ✗       |
+| Ver sus propios impuestos  | ✗     | ✗        | ✓       |
+| Confirmar pago de boleto   | ✗     | ✗        | ✓       |
+| Cargar sus movimientos     | ✗     | ✗        | ✓       |
+| Gestionar usuarios         | ✓     | ✗        | ✗       |
+
+---
+
+## Tests
+
+```bash
+cd backend
+npm test                  # todos los tests
+npm test uy-tax-calendar  # solo el calendario tributario
+npm run test:cov          # con coverage
+```
 
 ---
 
 ## Roadmap
 
-| Fase | Versión | Estado |
-|------|---------|--------|
-| Fase 1 | MVP v1.0 | 🔵 En planificación |
-| Fase 2 | v1.1 — Portal cliente | ⬜ Pendiente |
-| Fase 3 | v1.2 — Chat + Reportes | ⬜ Pendiente |
-| Fase 4 | v2.0 — Multi-contador SaaS | ⬜ Pendiente |
-
----
-
-## Documentación
-
-- [`docs/ContaApp_Concepto_v01.pdf`](docs/ContaApp_Concepto_v01.pdf) — Documento de concepto completo
-- [`docs/ContaApp_Concepto_v01.md`](docs/ContaApp_Concepto_v01.md) — Versión Markdown del documento
-
----
-
-## Autor
-
-**Lucas Martino** — [MK Studios](https://github.com/martino-lucas95)  
-Uruguay · 2026
+- [ ] Módulo de consultas contador ↔ cliente (mensajería)
+- [ ] Notificaciones push (WebSocket o SSE)
+- [ ] Exportación de reportes PDF/Excel
+- [ ] Generación automática de boletos desde vencimientos
+- [ ] Integración DGI (WebService oficial)
+- [ ] App mobile (React Native / PWA)
+- [ ] Multi-contador (agencia contable)
