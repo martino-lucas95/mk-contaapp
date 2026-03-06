@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: contaapp-frontend
+  namespace: contaapp
+  labels:
+    app: contaapp-frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: contaapp-frontend
+  template:
+    metadata:
+      labels:
+        app: contaapp-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: docker.io/library/contaapp-frontend:1.0.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
