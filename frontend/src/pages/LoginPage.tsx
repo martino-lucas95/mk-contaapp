@@ -1,4 +1,3 @@
-// LoginPage.tsx
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authApi } from '../services/api';
@@ -35,25 +34,19 @@ export default function LoginPage() {
         <form onSubmit={handleLogin}>
           <div style={{ marginBottom: '1rem' }}>
             <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.85rem', color: '#333' }}>Email</label>
-            <input
-              type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
               style={{ width: '100%', padding: '0.6rem', border: '1px solid #ccc', borderRadius: '6px', fontSize: '0.95rem', boxSizing: 'border-box' }}
-              required
-            />
+              required autoComplete="email" />
           </div>
           <div style={{ marginBottom: '1.5rem' }}>
             <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.85rem', color: '#333' }}>Contraseña</label>
-            <input
-              type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
               style={{ width: '100%', padding: '0.6rem', border: '1px solid #ccc', borderRadius: '6px', fontSize: '0.95rem', boxSizing: 'border-box' }}
-              required
-            />
+              required autoComplete="current-password" />
           </div>
           {error && <p style={{ color: '#c0392b', marginBottom: '1rem', fontSize: '0.85rem' }}>{error}</p>}
-          <button
-            type="submit" disabled={loading}
-            style={{ width: '100%', padding: '0.75rem', background: '#1F4E79', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '1rem', cursor: 'pointer' }}
-          >
+          <button type="submit" disabled={loading}
+            style={{ width: '100%', padding: '0.75rem', background: '#1F4E79', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '1rem', cursor: 'pointer' }}>
             {loading ? 'Ingresando...' : 'Ingresar'}
           </button>
         </form>
