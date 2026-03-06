@@ -12,7 +12,7 @@ export default defineConfig({
         name: 'ContaApp',
         short_name: 'ContaApp',
         description: 'Sistema de Gestión Contable',
-        theme_color: '#1F4E79',
+        theme_color: '#166534',
         background_color: '#ffffff',
         display: 'standalone',
         icons: [
