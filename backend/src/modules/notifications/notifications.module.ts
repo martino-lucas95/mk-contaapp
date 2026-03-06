@@ -1,10 +1,13 @@
-import { Module } from '@nestjs/common';
+import { Module }                  from '@nestjs/common';
+import { TypeOrmModule }           from '@nestjs/typeorm';
+import { Notification }            from './notification.entity';
+import { NotificationsService }    from './notifications.service';
+import { NotificationsController } from './notifications.controller';
 
-// TODO: Agregar TypeOrmModule.forFeature([...entidades]) y providers
 @Module({
-  imports: [],
-  providers: [],
-  controllers: [],
-  exports: [],
+  imports: [TypeOrmModule.forFeature([Notification])],
+  providers: [NotificationsService],
+  controllers: [NotificationsController],
+  exports: [NotificationsService],
 })
 export class NotificationsModule {}
