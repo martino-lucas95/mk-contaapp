@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: contaapp-backend
+  namespace: contaapp
+  labels:
+    app: contaapp-backend
+spec:
+  selector:
+    app: contaapp-backend
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 3000
