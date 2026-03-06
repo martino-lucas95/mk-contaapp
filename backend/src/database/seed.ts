@@ -1,12 +1,9 @@
 /**
  * seed.ts
- * Datos iniciales para desarrollo. Crea:
- *  - 1 usuario admin
- *  - 1 usuario contador (Lucas Martino)
- *  - 4 clientes con perfil tributario completo
- *  - Credenciales de acceso para cada cliente
- *  - Honorarios de los últimos 3 meses
- *  - Vencimientos generados automáticamente por el calendario DGI
+ * Datos iniciales para desarrollo.
+ * Modos:
+ *  - admin (default): crea/asegura solo el usuario admin
+ *  - full: crea admin + contador + clientes demo y datos asociados
  *
  * Uso: npm run seed
  * El bootstrap también lo llama en modo development si no existe el admin.
@@ -117,6 +114,7 @@ const SEED_CLIENTS = [
 
 // ─── Runner ───────────────────────────────────────────────────────────────────
 export async function runSeed(dataSource?: DataSource): Promise<void> {
+  const seedMode = (process.env.SEED_MODE || 'admin').toLowerCase() === 'full' ? 'full' : 'admin';
   let ds = dataSource;
   let shouldClose = false;
 
@@ -144,8 +142,12 @@ export async function runSeed(dataSource?: DataSource): Promise<void> {
   console.log('\n🌱 Iniciando seed...\n');
 
   // ── Usuarios ──────────────────────────────────────────────────────────────
+  const usersToSeed = seedMode === 'full'
+    ? SEED_USERS
+    : SEED_USERS.filter((u) => u.role === UserRole.ADMIN);
+
   const savedUsers: Record<string, User> = {};
-  for (const u of SEED_USERS) {
+  for (const u of usersToSeed) {
     const existing = await userRepo.findOne({ where: { email: u.email } });
     if (existing) {
       savedUsers[u.email] = existing;
@@ -158,7 +160,19 @@ export async function runSeed(dataSource?: DataSource): Promise<void> {
     console.log(`  ✓  Usuario creado: ${u.email} [${u.role}]`);
   }
 
+  if (seedMode !== 'full') {
+    if (shouldClose) await ds.destroy();
+    console.log('\n✅ Seed admin completado.\n');
+    console.log('── Cuentas disponibles ─────────────────────────────────');
+    console.log('  admin@contaapp.uy      / admin123   [admin]');
+    console.log('────────────────────────────────────────────────────────\n');
+    return;
+  }
+
   const contador = savedUsers['lucas@mkstudios.uy'];
+  if (!contador) {
+    throw new Error('Seed full inconsistente: no se encontró el usuario contador');
+  }
 
   // ── Clientes ──────────────────────────────────────────────────────────────
   const year = new Date().getFullYear();

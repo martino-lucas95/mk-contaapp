@@ -41,16 +41,26 @@ build_images() {
 
 create_database() {
     log_info "Creando base de datos 'contaapp'..."
-    POSTGRES_POD=$(kubectl get pods -n default -l app=postgres -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+    POSTGRES_NS=$(kubectl get pods -A -l app=postgres -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null || echo "")
+    POSTGRES_POD=$(kubectl get pods -A -l app=postgres -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
     if [ -z "$POSTGRES_POD" ]; then
         log_warn "Pod Postgres no encontrado. Creá la DB manualmente:"
-        echo "  kubectl exec -it <postgres-pod> -n default -- psql -U postgres -c 'CREATE DATABASE contaapp;'"
+        echo "  kubectl exec -it <postgres-pod> -n <namespace> -- psql -U postgres -d postgres -c \"CREATE DATABASE contaapp;\""
         return
     fi
-    kubectl exec -it $POSTGRES_POD -n default -- \
-        psql -U postgres -c "CREATE DATABASE contaapp;" 2>/dev/null \
-        && log_success "Base de datos creada." \
-        || log_info "La DB 'contaapp' ya existe."
+
+    DB_EXISTS=$(kubectl exec -i "$POSTGRES_POD" -n "$POSTGRES_NS" -- \
+      psql -U postgres -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='contaapp';" 2>/dev/null || echo "")
+
+    if [ "$DB_EXISTS" = "1" ]; then
+        log_info "La DB 'contaapp' ya existe."
+        return
+    fi
+
+    kubectl exec -i "$POSTGRES_POD" -n "$POSTGRES_NS" -- \
+      psql -U postgres -d postgres -c "CREATE DATABASE contaapp;" >/dev/null \
+      && log_success "Base de datos creada." \
+      || log_error "No se pudo crear la DB 'contaapp'. Revisá credenciales/permisos de Postgres."
 }
 
 deploy_k8s() {
@@ -77,7 +87,9 @@ run_seed() {
         log_error "Pod backend no encontrado. Desplegá primero: ./deploy.sh deploy"
         exit 1
     fi
-    kubectl exec -it $BACKEND_POD -n $NAMESPACE -- npm run seed
+    SEED_MODE="${SEED_MODE:-admin}"
+    log_info "Modo de seed: $SEED_MODE"
+    kubectl exec -it $BACKEND_POD -n $NAMESPACE -- env SEED_MODE="$SEED_MODE" npm run seed
     log_success "Seed completado."
 }
 
