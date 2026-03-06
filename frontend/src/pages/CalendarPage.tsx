@@ -108,9 +108,9 @@ export default function CalendarPage() {
       {loading ? (
         <div style={{ textAlign: 'center', color: '#94A3B8', padding: 48 }}>Cargando...</div>
       ) : Object.keys(porMes).length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 56, background: '#fff', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.07)' }}>
+        <div style={{ textAlign: 'center', padding: 56, background: theme.cardBg, borderRadius: 12, boxShadow: theme.cardShadow, border: `1px solid ${theme.cardBorder}` }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
-          <div style={{ color: '#64748B', fontSize: 14 }}>No hay vencimientos para mostrar</div>
+          <div style={{ color: theme.textSecondary, fontSize: 14 }}>No hay vencimientos para mostrar</div>
         </div>
       ) : (
         Object.entries(porMes).map(([mes, items]) => (

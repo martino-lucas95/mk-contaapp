@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { clientsApi } from '../services/api';
+import { useThemeStore } from '../store/theme.store';
 import { Client, TipoEmpresa, EstadoCliente, PerfilTributario } from '../types';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -306,6 +307,7 @@ function ClientModal({
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function ClientsPage() {
   const navigate = useNavigate();
+  const { theme } = useThemeStore();
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -366,8 +368,8 @@ export default function ClientsPage() {
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 700, color: '#0F172A', marginBottom: 4 }}>Clientes</h1>
-          <p style={{ color: '#64748B', fontSize: 14 }}>
+          <h1 style={{ fontSize: 22, fontWeight: 700, color: theme.textPrimary, marginBottom: 4 }}>Clientes</h1>
+          <p style={{ color: theme.textSecondary, fontSize: 14 }}>
             {loading ? 'Cargando...' : `${clients.length} cliente${clients.length !== 1 ? 's' : ''} registrado${clients.length !== 1 ? 's' : ''}`}
           </p>
         </div>
@@ -408,9 +410,9 @@ export default function ClientsPage() {
       </div>
 
       {/* Tabla */}
-      <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.07)', overflow: 'hidden' }}>
+      <div style={{ background: theme.cardBg, borderRadius: 12, boxShadow: theme.cardShadow, overflow: 'hidden', border: `1px solid ${theme.cardBorder}` }}>
         {loading ? (
-          <div style={{ padding: 48, textAlign: 'center', color: '#94A3B8', fontSize: 14 }}>Cargando clientes...</div>
+          <div style={{ padding: 48, textAlign: 'center', color: theme.textMuted, fontSize: 14 }}>Cargando clientes...</div>
         ) : filtered.length === 0 ? (
           <div style={{ padding: 56, textAlign: 'center' }}>
             <div style={{ fontSize: 40, marginBottom: 12 }}>👥</div>
@@ -424,11 +426,11 @@ export default function ClientsPage() {
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ background: '#F8FAFC', borderBottom: '1px solid #E2E8F0' }}>
+              <tr style={{ background: theme.tableHeaderBg, borderBottom: `1px solid ${theme.cardBorder}` }}>
                 {['Cliente', 'RUT / Empresa', 'Tributos', 'Estado', 'Acciones'].map(h => (
                   <th key={h} style={{
                     padding: '12px 16px', textAlign: 'left',
-                    fontSize: 12, fontWeight: 600, color: '#64748B',
+                    fontSize: 12, fontWeight: 600, color: theme.textMuted,
                     textTransform: 'uppercase', letterSpacing: '0.05em',
                   }}>{h}</th>
                 ))}
@@ -441,10 +443,10 @@ export default function ClientsPage() {
                   <tr
                     key={c.id}
                     style={{
-                      borderBottom: i < filtered.length - 1 ? '1px solid #F1F5F9' : 'none',
+                      borderBottom: i < filtered.length - 1 ? `1px solid ${theme.tableBorder}` : 'none',
                       cursor: 'pointer', transition: 'background 0.1s',
                     }}
-                    onMouseEnter={e => (e.currentTarget.style.background = '#F8FAFC')}
+                    onMouseEnter={e => (e.currentTarget.style.background = theme.tableRowHover)}
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                     onClick={() => navigate(`/clients/${c.id}`)}
                   >
@@ -453,18 +455,18 @@ export default function ClientsPage() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <div style={{
                           width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
-                          background: '#EDE9FE', color: '#6D28D9',
+                          background: theme.accentLight, color: theme.accentText,
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           fontSize: 12, fontWeight: 700,
                         }}>
                           {c.nombre[0]}{c.apellido[0]}
                         </div>
                         <div>
-                          <div style={{ fontSize: 14, fontWeight: 600, color: '#0F172A' }}>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: theme.textPrimary }}>
                             {c.nombre} {c.apellido}
                           </div>
                           {c.email && (
-                            <div style={{ fontSize: 12, color: '#94A3B8' }}>{c.email}</div>
+                            <div style={{ fontSize: 12, color: theme.textMuted }}>{c.email}</div>
                           )}
                         </div>
                       </div>
