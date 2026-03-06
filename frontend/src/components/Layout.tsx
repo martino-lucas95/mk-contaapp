@@ -18,9 +18,9 @@ const NAV_ADMIN    = [
   { to: '/admin/contadores', label: 'Contadores',  icon: Icons.users },
 ];
 const NAV_CONTADOR = [
-  { to: '/dashboard',   label: 'Dashboard',    icon: Icons.dashboard, exact: true },
+  { to: '/',            label: 'Dashboard',    icon: Icons.dashboard, exact: true },
   { to: '/clients',     label: 'Clientes',     icon: Icons.clients },
-  { to: '/calendar',   label: 'Vencimientos', icon: Icons.calendar },
+  { to: '/calendar',    label: 'Vencimientos', icon: Icons.calendar },
   { to: '/credentials', label: 'Credenciales', icon: Icons.credentials },
 ];
 
