@@ -74,7 +74,10 @@ export const credentialsApi = {
 export const feesApi = {
   getByClient: (clientId: string)          => api.get(`/fees/client/${clientId}`),
   resumen:     ()                          => api.get('/fees/resumen'),
+  create:      (clientId: string, data: any) => api.post(`/fees/client/${clientId}`, data),
+  update:      (id: string, data: any)     => api.put(`/fees/${id}`, data),
   marcarPago:  (id: string, data: any)     => api.patch(`/fees/${id}/pago`, data),
+  delete:      (id: string)               => api.delete(`/fees/${id}`),
 };
 
 // ── Notificaciones ────────────────────────────────────────────────────────────

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { clientsApi, calendarApi, credentialsApi, feesApi } from '../services/api';
-import { Client, Vencimiento, Credential, Honorario, EstadoVencimiento, PlataformaCredencial } from '../types';
+import { useThemeStore } from '../store/theme.store';
+import { Client, Vencimiento, Credential, Honorario, EstadoVencimiento, PlataformaCredencial, FormaPago } from '../types';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const ESTADO_VENC_COLORS: Record<EstadoVencimiento, { bg: string; color: string }> = {
@@ -68,6 +69,7 @@ const InfoRow = ({ label, value }: { label: string; value?: string | null }) =>
 export default function ClientDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { theme } = useThemeStore();
 
   const [client, setClient] = useState<Client | null>(null);
   const [vencimientos, setVencimientos] = useState<Vencimiento[]>([]);
@@ -75,6 +77,15 @@ export default function ClientDetailPage() {
   const [honorarios, setHonorarios] = useState<Honorario[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<'info' | 'vencimientos' | 'credenciales' | 'honorarios'>('info');
+
+  // ── Honorarios state ──
+  const [showHonModal, setShowHonModal] = useState(false);
+  const [honEditId, setHonEditId]       = useState<string | null>(null);
+  const [showPagoModal, setShowPagoModal] = useState<Honorario | null>(null);
+  const [honForm, setHonForm] = useState({ periodo: '', montoAcordado: '', montoCobrado: '0', formaPago: '' as FormaPago | '', notas: '' });
+  const [pagoForm, setPagoForm] = useState({ montoCobrado: '', fechaCobro: '', formaPago: 'transferencia' as FormaPago, notas: '' });
+  const [savingHon, setSavingHon] = useState(false);
+  const [honError, setHonError]   = useState('');
 
   // credential reveal
   const [revealed, setRevealed] = useState<Record<string, string>>({});
@@ -136,6 +147,89 @@ export default function ClientDetailPage() {
     await calendarApi.generar(id);
     const { data } = await calendarApi.getByClient(id);
     setVencimientos(data);
+  };
+
+  // ── Honorarios handlers ──
+  const openNewHon = () => {
+    const now = new Date();
+    const defaultPeriodo = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    setHonForm({ periodo: defaultPeriodo, montoAcordado: '', montoCobrado: '0', formaPago: '', notas: '' });
+    setHonEditId(null);
+    setHonError('');
+    setShowHonModal(true);
+  };
+
+  const openEditHon = (h: Honorario) => {
+    setHonForm({
+      periodo:       h.periodo,
+      montoAcordado: String(h.montoAcordado),
+      montoCobrado:  String(h.montoCobrado),
+      formaPago:     h.formaPago ?? '',
+      notas:         h.notas ?? '',
+    });
+    setHonEditId(h.id);
+    setHonError('');
+    setShowHonModal(true);
+  };
+
+  const handleSaveHon = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!id) return;
+    setSavingHon(true); setHonError('');
+    try {
+      const payload = {
+        periodo:       honForm.periodo,
+        montoAcordado: parseFloat(honForm.montoAcordado),
+        montoCobrado:  parseFloat(honForm.montoCobrado || '0'),
+        formaPago:     honForm.formaPago || undefined,
+        notas:         honForm.notas || undefined,
+      };
+      if (honEditId) {
+        await feesApi.marcarPago(honEditId, payload);
+      } else {
+        await feesApi.create(id, payload);
+      }
+      const { data } = await feesApi.getByClient(id);
+      setHonorarios(data);
+      setShowHonModal(false);
+    } catch (err: any) {
+      setHonError(err?.response?.data?.message || 'Error al guardar');
+    } finally { setSavingHon(false); }
+  };
+
+  const openPago = (h: Honorario) => {
+    setPagoForm({
+      montoCobrado: String(h.montoAcordado),
+      fechaCobro:   new Date().toISOString().slice(0, 10),
+      formaPago:    'transferencia',
+      notas:        '',
+    });
+    setShowPagoModal(h);
+  };
+
+  const handleSavePago = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!showPagoModal || !id) return;
+    setSavingHon(true); setHonError('');
+    try {
+      await feesApi.marcarPago(showPagoModal.id, {
+        montoCobrado: parseFloat(pagoForm.montoCobrado),
+        fechaCobro:   pagoForm.fechaCobro,
+        formaPago:    pagoForm.formaPago,
+        notas:        pagoForm.notas || undefined,
+      });
+      const { data } = await feesApi.getByClient(id);
+      setHonorarios(data);
+      setShowPagoModal(null);
+    } catch (err: any) {
+      setHonError(err?.response?.data?.message || 'Error al registrar pago');
+    } finally { setSavingHon(false); }
+  };
+
+  const handleDeleteHon = async (honId: string) => {
+    if (!confirm('¿Eliminar este honorario?') || !id) return;
+    await feesApi.delete(honId);
+    setHonorarios(hs => hs.filter(h => h.id !== honId));
   };
 
   if (loading) return <div style={{ padding: 48, textAlign: 'center', color: '#94A3B8' }}>Cargando...</div>;
@@ -415,44 +509,82 @@ export default function ClientDetailPage() {
       {/* ── TAB: HONORARIOS ── */}
       {tab === 'honorarios' && (
         <div>
-          <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.07)', overflow: 'hidden' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <p style={{ fontSize: 13, color: theme.textSecondary }}>
+              {honorarios.length} honorario{honorarios.length !== 1 ? 's' : ''} registrado{honorarios.length !== 1 ? 's' : ''}
+            </p>
+            <button onClick={openNewHon} style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '7px 16px', borderRadius: 8, border: 'none',
+              background: theme.accent, color: '#fff', fontSize: 13, fontWeight: 500, cursor: 'pointer',
+            }}>
+              + Nuevo honorario
+            </button>
+          </div>
+
+          <div style={{ background: theme.cardBg, borderRadius: 12, boxShadow: theme.cardShadow, overflow: 'hidden', border: `1px solid ${theme.cardBorder}` }}>
             {honorarios.length === 0 ? (
               <div style={{ padding: 48, textAlign: 'center' }}>
                 <div style={{ fontSize: 36, marginBottom: 12 }}>💰</div>
-                <div style={{ color: '#64748B', fontSize: 14 }}>No hay honorarios registrados</div>
+                <div style={{ color: theme.textSecondary, fontSize: 14 }}>No hay honorarios registrados</div>
+                <div style={{ color: theme.textMuted, fontSize: 13, marginTop: 4 }}>Creá el primero con el botón de arriba</div>
               </div>
             ) : (
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
-                  <tr style={{ background: '#F8FAFC', borderBottom: '1px solid #E2E8F0' }}>
-                    {['Período', 'Acordado', 'Cobrado', 'Estado', 'Forma de pago'].map(h => (
-                      <th key={h} style={{ padding: '11px 16px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
+                  <tr style={{ background: theme.tableHeaderBg, borderBottom: `1px solid ${theme.cardBorder}` }}>
+                    {['Período', 'Acordado', 'Cobrado', 'Pendiente', 'Estado', 'Forma de pago', 'Acciones'].map(h => (
+                      <th key={h} style={{ padding: '11px 16px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {honorarios.map((h, i) => {
                     const estadoColors = {
-                      al_dia: { bg: '#DCFCE7', color: '#15803D' },
-                      pendiente: { bg: '#FEF3C7', color: '#D97706' },
-                      vencido: { bg: '#FEE2E2', color: '#DC2626' },
+                      al_dia:    { bg: '#DCFCE7', color: '#15803D', label: 'Al día' },
+                      pendiente: { bg: '#FEF3C7', color: '#D97706', label: 'Pendiente' },
+                      vencido:   { bg: '#FEE2E2', color: '#DC2626', label: 'Vencido' },
                     };
-                    const c = estadoColors[h.estado] ?? estadoColors.pendiente;
+                    const sc = estadoColors[h.estado] ?? estadoColors.pendiente;
+                    const pendiente = Number(h.montoAcordado) - Number(h.montoCobrado);
                     return (
-                      <tr key={h.id} style={{ borderBottom: i < honorarios.length - 1 ? '1px solid #F1F5F9' : 'none' }}>
-                        <td style={{ padding: '13px 16px', fontSize: 14, color: '#0F172A', fontWeight: 500 }}>{h.periodo}</td>
-                        <td style={{ padding: '13px 16px', fontSize: 14, color: '#0F172A' }}>
-                          ${h.montoAcordado.toLocaleString('es-UY')}
+                      <tr key={h.id} style={{ borderBottom: i < honorarios.length - 1 ? `1px solid ${theme.tableBorder}` : 'none' }}>
+                        <td style={{ padding: '13px 16px', fontSize: 14, color: theme.textPrimary, fontWeight: 600 }}>{h.periodo}</td>
+                        <td style={{ padding: '13px 16px', fontSize: 14, color: theme.textPrimary }}>
+                          ${Number(h.montoAcordado).toLocaleString('es-UY')}
                         </td>
-                        <td style={{ padding: '13px 16px', fontSize: 14, color: '#0F172A' }}>
-                          ${h.montoCobrado.toLocaleString('es-UY')}
+                        <td style={{ padding: '13px 16px', fontSize: 14, color: '#15803D', fontWeight: 500 }}>
+                          ${Number(h.montoCobrado).toLocaleString('es-UY')}
+                        </td>
+                        <td style={{ padding: '13px 16px', fontSize: 14, color: pendiente > 0 ? '#D97706' : theme.textMuted, fontWeight: pendiente > 0 ? 600 : 400 }}>
+                          {pendiente > 0 ? `${pendiente.toLocaleString('es-UY')}` : '—'}
                         </td>
                         <td style={{ padding: '13px 16px' }}>
-                          <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 500, background: c.bg, color: c.color }}>
-                            {h.estado.replace('_', ' ')}
+                          <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 500, background: sc.bg, color: sc.color }}>
+                            {sc.label}
                           </span>
                         </td>
-                        <td style={{ padding: '13px 16px', fontSize: 13, color: '#64748B' }}>{h.formaPago ?? '—'}</td>
+                        <td style={{ padding: '13px 16px', fontSize: 13, color: theme.textSecondary }}>
+                          {h.formaPago ? h.formaPago.charAt(0).toUpperCase() + h.formaPago.slice(1) : '—'}
+                        </td>
+                        <td style={{ padding: '13px 16px' }}>
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            {h.estado !== 'al_dia' && (
+                              <button onClick={() => openPago(h)} title="Registrar pago"
+                                style={{ padding: '4px 10px', borderRadius: 6, border: 'none', background: '#DCFCE7', color: '#15803D', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                                💳 Pagar
+                              </button>
+                            )}
+                            <button onClick={() => openEditHon(h)} title="Editar"
+                              style={{ padding: '4px 8px', borderRadius: 6, border: `1px solid ${theme.cardBorder}`, background: theme.cardBg, cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                              <svg width="13" height="13" fill="none" stroke={theme.textSecondary} strokeWidth="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                            </button>
+                            <button onClick={() => handleDeleteHon(h.id)} title="Eliminar"
+                              style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #FEE2E2', background: '#FFF5F5', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                              <svg width="13" height="13" fill="none" stroke="#DC2626" strokeWidth="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     );
                   })}
@@ -460,6 +592,79 @@ export default function ClientDetailPage() {
               </table>
             )}
           </div>
+
+          {/* Modal nuevo/editar honorario */}
+          {showHonModal && (
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
+              onClick={e => e.target === e.currentTarget && setShowHonModal(false)}>
+              <div style={{ background: '#fff', borderRadius: 14, padding: '28px', width: 420, boxShadow: '0 20px 40px rgba(0,0,0,0.18)' }}>
+                <h2 style={{ fontSize: 17, fontWeight: 700, color: '#0F172A', marginBottom: 20 }}>
+                  {honEditId ? 'Editar honorario' : 'Nuevo honorario'}
+                </h2>
+                <form onSubmit={handleSaveHon}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
+                    <HonField label="Período (YYYY-MM)" value={honForm.periodo} onChange={v => setHonForm(f => ({ ...f, periodo: v }))} placeholder="2026-03" required />
+                    <HonField label="Monto acordado ($)" value={honForm.montoAcordado} onChange={v => setHonForm(f => ({ ...f, montoAcordado: v }))} type="number" required />
+                    <HonField label="Monto cobrado ($)" value={honForm.montoCobrado} onChange={v => setHonForm(f => ({ ...f, montoCobrado: v }))} type="number" />
+                    <div>
+                      <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 5 }}>Forma de pago</label>
+                      <select value={honForm.formaPago} onChange={e => setHonForm(f => ({ ...f, formaPago: e.target.value as FormaPago | '' }))}
+                        style={{ width: '100%', padding: '8px 11px', borderRadius: 7, border: '1px solid #D1D5DB', fontSize: 14, background: '#fff', boxSizing: 'border-box' as const }}>
+                        <option value="">Sin especificar</option>
+                        <option value="efectivo">Efectivo</option>
+                        <option value="transferencia">Transferencia</option>
+                        <option value="otro">Otro</option>
+                      </select>
+                    </div>
+                    <HonField label="Notas" value={honForm.notas} onChange={v => setHonForm(f => ({ ...f, notas: v }))} />
+                  </div>
+                  {honError && <div style={{ background: '#FEE2E2', color: '#DC2626', borderRadius: 7, padding: '8px 12px', fontSize: 13, marginTop: 12 }}>{honError}</div>}
+                  <div style={{ display: 'flex', gap: 10, marginTop: 20, justifyContent: 'flex-end' }}>
+                    <button type="button" onClick={() => setShowHonModal(false)} style={{ padding: '8px 18px', borderRadius: 7, border: '1px solid #E2E8F0', background: '#fff', color: '#475569', fontSize: 14, cursor: 'pointer' }}>Cancelar</button>
+                    <button type="submit" disabled={savingHon} style={{ padding: '8px 20px', borderRadius: 7, border: 'none', background: theme.accent, color: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer', opacity: savingHon ? 0.7 : 1 }}>
+                      {savingHon ? 'Guardando...' : honEditId ? 'Guardar cambios' : 'Crear honorario'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* Modal registrar pago */}
+          {showPagoModal && (
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
+              onClick={e => e.target === e.currentTarget && setShowPagoModal(null)}>
+              <div style={{ background: '#fff', borderRadius: 14, padding: '28px', width: 400, boxShadow: '0 20px 40px rgba(0,0,0,0.18)' }}>
+                <h2 style={{ fontSize: 17, fontWeight: 700, color: '#0F172A', marginBottom: 4 }}>Registrar pago</h2>
+                <p style={{ fontSize: 13, color: '#64748B', marginBottom: 20 }}>
+                  Honorario <strong>{showPagoModal.periodo}</strong> — acordado: <strong>${Number(showPagoModal.montoAcordado).toLocaleString('es-UY')}</strong>
+                </p>
+                <form onSubmit={handleSavePago}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
+                    <HonField label="Monto cobrado ($)" value={pagoForm.montoCobrado} onChange={v => setPagoForm(f => ({ ...f, montoCobrado: v }))} type="number" required />
+                    <HonField label="Fecha de cobro" value={pagoForm.fechaCobro} onChange={v => setPagoForm(f => ({ ...f, fechaCobro: v }))} type="date" required />
+                    <div>
+                      <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 5 }}>Forma de pago <span style={{ color: '#DC2626' }}>*</span></label>
+                      <select value={pagoForm.formaPago} onChange={e => setPagoForm(f => ({ ...f, formaPago: e.target.value as FormaPago }))}
+                        style={{ width: '100%', padding: '8px 11px', borderRadius: 7, border: '1px solid #D1D5DB', fontSize: 14, background: '#fff', boxSizing: 'border-box' as const }}>
+                        <option value="transferencia">Transferencia</option>
+                        <option value="efectivo">Efectivo</option>
+                        <option value="otro">Otro</option>
+                      </select>
+                    </div>
+                    <HonField label="Notas (opcional)" value={pagoForm.notas} onChange={v => setPagoForm(f => ({ ...f, notas: v }))} />
+                  </div>
+                  {honError && <div style={{ background: '#FEE2E2', color: '#DC2626', borderRadius: 7, padding: '8px 12px', fontSize: 13, marginTop: 12 }}>{honError}</div>}
+                  <div style={{ display: 'flex', gap: 10, marginTop: 20, justifyContent: 'flex-end' }}>
+                    <button type="button" onClick={() => setShowPagoModal(null)} style={{ padding: '8px 18px', borderRadius: 7, border: '1px solid #E2E8F0', background: '#fff', color: '#475569', fontSize: 14, cursor: 'pointer' }}>Cancelar</button>
+                    <button type="submit" disabled={savingHon} style={{ padding: '8px 20px', borderRadius: 7, border: 'none', background: '#15803D', color: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer', opacity: savingHon ? 0.7 : 1 }}>
+                      {savingHon ? 'Guardando...' : '💳 Confirmar pago'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -474,6 +679,24 @@ function CredField({ label, value, onChange, type = 'text' }: { label: string; v
       <input type={type} value={value} onChange={e => onChange(e.target.value)}
         style={{ width: '100%', padding: '8px 11px', borderRadius: 7, border: '1px solid #D1D5DB', fontSize: 14, color: '#0F172A', outline: 'none', boxSizing: 'border-box' as const }}
         onFocus={e => (e.target.style.borderColor = '#6D28D9')}
+        onBlur={e => (e.target.style.borderColor = '#D1D5DB')} />
+    </div>
+  );
+}
+
+function HonField({ label, value, onChange, type = 'text', required, placeholder }: {
+  label: string; value: string; onChange: (v: string) => void;
+  type?: string; required?: boolean; placeholder?: string;
+}) {
+  return (
+    <div>
+      <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 5 }}>
+        {label}{required && <span style={{ color: '#DC2626' }}> *</span>}
+      </label>
+      <input type={type} value={value} onChange={e => onChange(e.target.value)}
+        required={required} placeholder={placeholder}
+        style={{ width: '100%', padding: '8px 11px', borderRadius: 7, border: '1px solid #D1D5DB', fontSize: 14, color: '#0F172A', outline: 'none', boxSizing: 'border-box' as const }}
+        onFocus={e => (e.target.style.borderColor = '#2563eb')}
         onBlur={e => (e.target.style.borderColor = '#D1D5DB')} />
     </div>
   );
