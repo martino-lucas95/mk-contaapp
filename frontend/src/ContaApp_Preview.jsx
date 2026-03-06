@@ -198,9 +198,7 @@ const CSS = `
   .login-btn{width:100%;padding:11px;margin-top:8px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius);font-family:var(--font-body);font-size:14px;font-weight:500;cursor:pointer;transition:all .14s;}
   .login-btn:hover{background:var(--accent2);transform:translateY(-1px);box-shadow:0 6px 20px rgba(79,142,247,.28);}
   .login-footer{text-align:center;font-size:11.5px;color:var(--text3);margin-top:20px;}
-  .role-switch{display:flex;gap:8px;margin-bottom:20px;}
-  .role-btn{flex:1;padding:8px;border-radius:var(--radius);border:1px solid var(--border2);background:transparent;color:var(--text2);font-family:var(--font-body);font-size:12.5px;cursor:pointer;transition:all .14s;}
-  .role-btn.active{background:var(--accentbg2);border-color:var(--accent);color:var(--accent2);}
+  /* role-switch removido — el rol se detecta desde el JWT */
 
   .coming-soon{flex:1;display:flex;align-items:center;justify-content:center;min-height:50vh;padding:40px 24px;}
 
@@ -315,7 +313,7 @@ const MOVIMIENTOS_CLIENTE = [
 ];
 
 // ── Sidebar ───────────────────────────────────────────────────────────────────
-function Sidebar({ page, setPage, open, onClose, role }) {
+function Sidebar({ page, setPage, open, onClose, role, user, onLogout }) {
   const navContador = [
     { id:'dashboard',   icon:'grid',     label:'Dashboard'       },
     { id:'clients',     icon:'users',    label:'Clientes'        },
@@ -357,14 +355,12 @@ function Sidebar({ page, setPage, open, onClose, role }) {
         </nav>
         <div className="sidebar-footer">
           <div className="user-chip">
-            <div className={`avatar ${role}`}>
-              {role === 'cliente' ? 'MF' : 'LM'}
-            </div>
+            <div className={`avatar ${role}`}>{user?.initials || '??'}</div>
             <div className="user-info">
-              <div className="user-name">{role === 'cliente' ? 'María Fernández' : 'Lucas Martino'}</div>
-              <div className="user-role">{role === 'cliente' ? 'Portal Cliente' : 'Contador'}</div>
+              <div className="user-name">{user?.nombre || 'Usuario'}</div>
+              <div className="user-role" style={{textTransform:'capitalize'}}>{role}</div>
             </div>
-            <span style={{color:'var(--text3)'}}><Icon name="logout" size={14}/></span>
+            <span style={{color:'var(--text3)',cursor:'pointer'}} onClick={onLogout}><Icon name="logout" size={14}/></span>
           </div>
         </div>
       </aside>
@@ -805,37 +801,84 @@ function Consultas() {
 }
 
 // ── Login ─────────────────────────────────────────────────────────────────────
+// Cuentas de demo — en prod el rol viene del JWT (user.role)
+const DEMO_ACCOUNTS = {
+  'lucas@mkstudios.uy':  { role: 'contador', nombre: 'Lucas Martino',   initials: 'LM' },
+  'admin@contaapp.uy':   { role: 'admin',    nombre: 'Admin ContaApp',   initials: 'AC' },
+  'maria@fernandez.uy':  { role: 'cliente',  nombre: 'María Fernández',  initials: 'MF' },
+  'roberto@pereira.uy':  { role: 'cliente',  nombre: 'Roberto Pereira',  initials: 'RP' },
+};
+
 function Login({ onLogin }) {
-  const [email,   setEmail]   = useState('lucas@mkstudios.uy');
+  const [email,   setEmail]   = useState('');
   const [pass,    setPass]    = useState('');
-  const [role,    setRole]    = useState('contador');
+  const [error,   setError]   = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleLogin = () => {
+    if (!email || !pass) { setError('Completá todos los campos.'); return; }
     setLoading(true);
-    setTimeout(()=>{ setLoading(false); onLogin(role); }, 800);
+    setError('');
+    // Simula llamada a POST /auth/login → recibe { accessToken, user: { role, ... } }
+    setTimeout(() => {
+      const account = DEMO_ACCOUNTS[email.toLowerCase()];
+      if (!account || pass.length < 3) {
+        setLoading(false);
+        setError('Email o contraseña incorrectos.');
+        return;
+      }
+      setLoading(false);
+      // En producción: onLogin(jwt_payload.role, jwt_payload)
+      onLogin(account.role, account);
+    }, 800);
   };
+
+  const handleKey = (e) => { if (e.key === 'Enter') handleLogin(); };
 
   return (
     <div className="login-wrap">
       <div className="login-card fi">
         <div className="login-logo-wrap"><Logo size={36}/><div><div className="logo-text">ContaApp</div><div className="logo-sub">MK Studios · Uruguay</div></div></div>
         <div className="login-title">Bienvenido de vuelta</div>
-        <div className="login-sub">Ingresá a tu panel de gestión contable</div>
-        <div className="role-switch">
-          <button className={`role-btn ${role==='contador'?'active':''}`} onClick={()=>{ setRole('contador'); setEmail('lucas@mkstudios.uy'); }}>🏢 Contador</button>
-          <button className={`role-btn ${role==='cliente'?'active':''}`}  onClick={()=>{ setRole('cliente');  setEmail('maria@fernandez.uy'); }}>👤 Portal Cliente</button>
-        </div>
+        <div className="login-sub">Ingresá con tu email y contraseña</div>
         <div className="form-group">
           <label className="form-label">Email</label>
-          <input className="form-input" type="email" value={email} onChange={e=>setEmail(e.target.value)}/>
+          <input className="form-input" type="email" placeholder="tu@email.com" value={email}
+            onChange={e=>{ setEmail(e.target.value); setError(''); }}
+            onKeyDown={handleKey} autoComplete="email"/>
         </div>
         <div className="form-group">
           <label className="form-label">Contraseña</label>
-          <input className="form-input" type="password" placeholder="••••••••" value={pass} onChange={e=>setPass(e.target.value)}/>
+          <input className="form-input" type="password" placeholder="••••••••" value={pass}
+            onChange={e=>{ setPass(e.target.value); setError(''); }}
+            onKeyDown={handleKey} autoComplete="current-password"/>
         </div>
-        <button className="login-btn" onClick={handleLogin} disabled={loading}>{loading?'Ingresando...':'Ingresar'}</button>
-        <div className="login-footer">ContaApp v1.0 · {role==='cliente'?'Portal cliente — María Fernández':'Panel del contador'}</div>
+        {error && (
+          <div style={{background:'var(--redbg)',border:'1px solid rgba(247,96,96,.25)',borderRadius:'var(--radius)',padding:'9px 13px',marginBottom:12,fontSize:13,color:'var(--red)',display:'flex',alignItems:'center',gap:8}}>
+            <Icon name="alert" size={14}/> {error}
+          </div>
+        )}
+        <button className="login-btn" onClick={handleLogin} disabled={loading}>
+          {loading ? 'Verificando...' : 'Ingresar'}
+        </button>
+        <div className="login-footer" style={{marginTop:24,paddingTop:16,borderTop:'1px solid var(--border)',textAlign:'left'}}>
+          <div style={{fontSize:11,color:'var(--text3)',marginBottom:6,fontWeight:600,letterSpacing:'.5px',textTransform:'uppercase'}}>Cuentas de demo</div>
+          {Object.entries(DEMO_ACCOUNTS).map(([mail, acc])=>(
+            <div key={mail} onClick={()=>{ setEmail(mail); setPass('demo123'); setError(''); }}
+              style={{display:'flex',alignItems:'center',gap:8,padding:'5px 8px',borderRadius:6,cursor:'pointer',transition:'background .12s',marginBottom:2}}
+              onMouseEnter={e=>e.currentTarget.style.background='var(--bg3)'}
+              onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+              <div style={{width:24,height:24,borderRadius:6,background: acc.role==='cliente'?'linear-gradient(135deg,var(--green),#0d9488)': acc.role==='admin'?'linear-gradient(135deg,var(--red),#c0392b)':'linear-gradient(135deg,var(--accent),#8b5cf6)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,fontWeight:700,color:'#fff',flexShrink:0}}>{acc.initials}</div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:12,color:'var(--text)',fontWeight:500}}>{acc.nombre}</div>
+                <div style={{fontSize:10.5,color:'var(--text3)'}}>{mail}</div>
+              </div>
+              <span style={{fontSize:10,padding:'1px 6px',borderRadius:99,fontWeight:600,background: acc.role==='cliente'?'var(--greenbg)':acc.role==='admin'?'var(--redbg)':'var(--accentbg)',color: acc.role==='cliente'?'var(--green)':acc.role==='admin'?'var(--red)':'var(--accent2)'}}>
+                {acc.role}
+              </span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -859,28 +902,49 @@ const PAGES_CLIENTE = {
   consultas:   { title:'Consultas',       comp:Consultas      },
 };
 
+// ── Derivación por rol ────────────────────────────────────────────────────────
+// admin y contador → panel de gestión
+// cliente          → portal del cliente
+// En producción este mapeo lo hace el router leyendo el JWT en localStorage
+function defaultPageForRole(role) {
+  return role === 'cliente' ? 'portal' : 'dashboard';
+}
+
+function pagesForRole(role) {
+  // admin ve lo mismo que contador (en el futuro puede tener extras)
+  return role === 'cliente' ? PAGES_CLIENTE : PAGES_CONTADOR;
+}
+
 export default function App() {
-  const [loggedIn,    setLoggedIn]    = useState(false);
-  const [role,        setRole]        = useState('contador');
+  const [currentUser, setCurrentUser] = useState(null); // { role, nombre, initials }
   const [page,        setPage]        = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const handleLogin = (r) => {
-    setRole(r);
-    setPage(r === 'cliente' ? 'portal' : 'dashboard');
-    setLoggedIn(true);
+  const handleLogin = (role, userData) => {
+    setCurrentUser({ role, ...userData });
+    setPage(defaultPageForRole(role));
   };
 
-  const pages = role === 'cliente' ? PAGES_CLIENTE : PAGES_CONTADOR;
-  const { title, comp: Page } = pages[page] || Object.values(pages)[0];
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setPage('dashboard');
+  };
 
-  if (!loggedIn) return <><style>{CSS}</style><Login onLogin={handleLogin}/></>;
+  if (!currentUser) return <><style>{CSS}</style><Login onLogin={handleLogin}/></>;
+
+  const { role } = currentUser;
+  const pages = pagesForRole(role);
+  const { title, comp: Page } = pages[page] || Object.values(pages)[0];
 
   return (
     <>
       <style>{CSS}</style>
       <div className="app">
-        <Sidebar page={page} setPage={setPage} open={sidebarOpen} onClose={()=>setSidebarOpen(false)} role={role}/>
+        <Sidebar
+          page={page} setPage={setPage}
+          open={sidebarOpen} onClose={()=>setSidebarOpen(false)}
+          role={role} user={currentUser} onLogout={handleLogout}
+        />
         <div className="main">
           <Topbar title={title} onMenu={()=>setSidebarOpen(true)} role={role}/>
           <Page/>
