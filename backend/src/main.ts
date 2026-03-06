@@ -2,7 +2,6 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { UsersService } from './modules/users/users.service';
-import { runSeed } from './database/seed';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
@@ -11,10 +10,15 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api/v1');
 
+  // Health check para k8s readiness/liveness probes
+  app.use('/api/v1/health', (_req, res) => {
+    res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+  });
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
-      forbidNonWhitelisted: false, // laxo en dev para no frenar iteración
+      forbidNonWhitelisted: false,
       transform: true,
     }),
   );
@@ -27,7 +31,6 @@ async function bootstrap() {
     credentials: true,
   });
 
-  // Auto-seed en desarrollo: crea usuarios base si no existen
   if (process.env.NODE_ENV !== 'production') {
     const usersService = app.get(UsersService);
     await usersService.ensureAdminExists();
