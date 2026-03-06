@@ -6,14 +6,12 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-// Interceptor: adjuntar token en cada request
 api.interceptors.request.use((config) => {
   const token = useAuthStore.getState().accessToken;
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
 
-// Interceptor: refresh token automático si 401
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -21,7 +19,7 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !original._retry) {
       original._retry = true;
       try {
-        const { refreshToken, setTokens, logout } = useAuthStore.getState();
+        const { refreshToken, setTokens } = useAuthStore.getState();
         const { data } = await axios.post('/api/v1/auth/refresh', { refreshToken });
         setTokens(data.accessToken, data.refreshToken);
         original.headers.Authorization = `Bearer ${data.accessToken}`;
@@ -37,7 +35,6 @@ api.interceptors.response.use(
 
 export default api;
 
-// ─── Servicios específicos ────────────────────────────────────────────────────
 export const clientsApi = {
   getAll: () => api.get('/clients'),
   getOne: (id: string) => api.get(`/clients/${id}`),
