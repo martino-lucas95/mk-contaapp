@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: backend
-          image: docker.io/library/contaapp-backend:1.0.4
+          image: docker.io/library/contaapp-backend:1.0.5
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3000

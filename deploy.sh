@@ -12,8 +12,8 @@ PROJECT_ROOT="$SCRIPT_DIR"
 if [ -f "$SCRIPT_DIR/versions.env" ]; then
     source "$SCRIPT_DIR/versions.env"
 else
-    echo "BACKEND_VERSION=1.0.4"  > "$SCRIPT_DIR/versions.env"
-    echo "FRONTEND_VERSION=1.0.4" >> "$SCRIPT_DIR/versions.env"
+    echo "BACKEND_VERSION=1.0.5"  > "$SCRIPT_DIR/versions.env"
+    echo "FRONTEND_VERSION=1.0.5" >> "$SCRIPT_DIR/versions.env"
     source "$SCRIPT_DIR/versions.env"
 fi
 
@@ -161,7 +161,8 @@ show_help() {
     echo "  build     Construye imágenes Docker e importa a k3s"
     echo "  deploy    Aplica los manifests k8s"
     echo "  all       Build + crear DB + deploy (primer deploy)"
-    echo "  seed      Ejecuta seed de datos iniciales"
+    echo "  seed       Ejecuta seed completo (admin + contador + clientes demo)
+  seed:admin Crea solo el usuario admin"
     echo "  update    Actualiza imagen con la versión de versions.env"
     echo "  argocd    Registra la app en ArgoCD (GitOps automático)"
     echo "  status    Muestra pods, services, ingress"
@@ -172,10 +173,10 @@ show_help() {
     echo "Primer deploy:"
     echo "  1. Editar k8s/secret.yaml con secretos reales"
     echo "  2. ./deploy.sh all"
-    echo "  3. ./deploy.sh seed"
+    echo "  3. ./deploy.sh seed        # crea todos los usuarios demo"
     echo ""
     echo "Actualización:"
-    echo "  1. Editar versions.env  (ej: BACKEND_VERSION=1.0.4)"
+    echo "  1. Editar versions.env  (ej: BACKEND_VERSION=1.0.5)"
     echo "  2. ./deploy.sh build"
     echo "  3. ./deploy.sh update"
     echo ""
@@ -187,7 +188,8 @@ case "${1:-help}" in
     build)   build_images       ;;
     deploy)  deploy_k8s         ;;
     all)     build_images; create_database; deploy_k8s ;;
-    seed)    run_seed            ;;
+    seed)    run_seed full        ;;
+    seed:admin) run_seed admin   ;;
     update)  update_image        ;;
     argocd)  setup_argocd        ;;
     status)  show_status         ;;
