@@ -45,12 +45,12 @@ create_database() {
     POSTGRES_POD=$(kubectl get pods -A -l app=postgres -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
     if [ -z "$POSTGRES_POD" ]; then
         log_warn "Pod Postgres no encontrado. Creá la DB manualmente:"
-        echo "  kubectl exec -it <postgres-pod> -n <namespace> -- psql -U postgres -d postgres -c \"CREATE DATABASE contaapp;\""
+        echo "  kubectl exec -it <postgres-pod> -n <namespace> -- psql -U postgres -d template1 -c \"CREATE DATABASE contaapp;\""
         return
     fi
 
     DB_EXISTS=$(kubectl exec -i "$POSTGRES_POD" -n "$POSTGRES_NS" -- \
-      psql -U postgres -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='contaapp';" 2>/dev/null || echo "")
+      psql -U postgres -d template1 -tAc "SELECT 1 FROM pg_database WHERE datname='contaapp';" 2>/dev/null || echo "")
 
     if [ "$DB_EXISTS" = "1" ]; then
         log_info "La DB 'contaapp' ya existe."
@@ -58,7 +58,7 @@ create_database() {
     fi
 
     kubectl exec -i "$POSTGRES_POD" -n "$POSTGRES_NS" -- \
-      psql -U postgres -d postgres -c "CREATE DATABASE contaapp;" >/dev/null \
+      psql -U postgres -d template1 -c "CREATE DATABASE contaapp;" >/dev/null \
       && log_success "Base de datos creada." \
       || log_error "No se pudo crear la DB 'contaapp'. Revisá credenciales/permisos de Postgres."
 }
@@ -73,9 +73,12 @@ deploy_k8s() {
     kubectl apply -f frontend-deployment.yaml
     kubectl apply -f frontend-service.yaml
     kubectl apply -f ingress.yaml
+    log_info "Forzando reinicio para tomar imágenes recién importadas..."
+    kubectl rollout restart deployment/contaapp-backend  -n $NAMESPACE
+    kubectl rollout restart deployment/contaapp-frontend -n $NAMESPACE
     log_info "Esperando pods..."
-    kubectl wait --for=condition=ready pod -l app=contaapp-backend  -n $NAMESPACE --timeout=120s || log_warn "Backend pod no listo aún"
-    kubectl wait --for=condition=ready pod -l app=contaapp-frontend -n $NAMESPACE --timeout=120s || log_warn "Frontend pod no listo aún"
+    kubectl rollout status deployment/contaapp-backend  -n $NAMESPACE --timeout=180s || log_warn "Backend deployment no listo aún"
+    kubectl rollout status deployment/contaapp-frontend -n $NAMESPACE --timeout=180s || log_warn "Frontend deployment no listo aún"
     log_success "Deploy aplicado."
     show_status
 }
