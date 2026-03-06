@@ -121,7 +121,7 @@ export default function DashboardPage() {
                 fontWeight: 500,
               }}
             >
-              🔔 {unread} notificación{unread === 1 ? '' : 'es'} sin leer
+              🔔 {unread} notificación {unread === 1 ? '' : 'es'} sin leer
             </span>
           )}
         </p>
