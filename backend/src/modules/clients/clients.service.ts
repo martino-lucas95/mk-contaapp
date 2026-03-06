@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Client, EstadoCliente } from './client.entity';
+import { Client, EstadoCliente, TipoEmpresa } from './client.entity';
 import { UserRole } from '../users/user.entity';
 
 export class CreateClientDto {
@@ -25,6 +25,13 @@ export class CreateClientDto {
   cjppu?: boolean;
   fondoSolidaridad?: boolean;
   notas?: string;
+}
+
+function parseTipoEmpresa(value?: string): TipoEmpresa | undefined {
+  if (!value) return undefined;
+  const normalized = value.trim().toLowerCase();
+  const allowed = new Set<string>(Object.values(TipoEmpresa));
+  return allowed.has(normalized) ? (normalized as TipoEmpresa) : undefined;
 }
 
 @Injectable()
@@ -63,13 +70,26 @@ export class ClientsService {
   }
 
   async create(dto: CreateClientDto, contadorId: string): Promise<Client> {
-    const client = this.clientRepo.create({ ...dto, contadorId });
+    const client = this.clientRepo.create({
+      ...dto,
+      contadorId,
+      tipoEmpresa: parseTipoEmpresa(dto.tipoEmpresa) ?? null,
+      fechaInicioActividades: dto.fechaInicioActividades
+        ? new Date(dto.fechaInicioActividades)
+        : null,
+    });
     return this.clientRepo.save(client);
   }
 
   async update(id: string, dto: Partial<CreateClientDto>, userId: string, userRole: UserRole): Promise<Client> {
     const client = await this.findOne(id, userId, userRole);
     Object.assign(client, dto);
+    if (dto.tipoEmpresa !== undefined) client.tipoEmpresa = parseTipoEmpresa(dto.tipoEmpresa) ?? null;
+    if (dto.fechaInicioActividades !== undefined) {
+      client.fechaInicioActividades = dto.fechaInicioActividades
+        ? new Date(dto.fechaInicioActividades)
+        : null;
+    }
     return this.clientRepo.save(client);
   }
 

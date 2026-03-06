@@ -45,8 +45,8 @@ export class PaymentsService {
       tipoImpuesto:    dto.tipoImpuesto,
       periodo:         dto.periodo,
       monto:           dto.monto,
-      fechaEmision:    dto.fechaEmision    ? new Date(dto.fechaEmision)    : null,
-      fechaVencimiento:dto.fechaVencimiento? new Date(dto.fechaVencimiento): null,
+      fechaEmision:    dto.fechaEmision     ? new Date(dto.fechaEmision)     : undefined,
+      fechaVencimiento:dto.fechaVencimiento ? new Date(dto.fechaVencimiento) : undefined,
       notas:           dto.notas,
       estado:          EstadoBoleto.EMITIDO,
     });

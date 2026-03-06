@@ -15,7 +15,7 @@
 import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { User, UserRole } from '../modules/users/user.entity';
-import { Client } from '../modules/clients/client.entity';
+import { Client, TipoEmpresa } from '../modules/clients/client.entity';
 import { Credential, PlataformaCredencial } from '../modules/credentials/credential.entity';
 import { Honorario, EstadoHonorario, FormaPago } from '../modules/fees/honorario.entity';
 import { generarVencimientosAnuales } from '../modules/calendar/uy-tax-calendar';
@@ -53,7 +53,7 @@ const SEED_CLIENTS = [
     nombre: 'María', apellido: 'Fernández',
     razonSocial: 'Fernández & Asoc. SAS',
     rut: '213456789', email: 'maria@fernandez.uy',
-    tipoEmpresa: 'SAS',
+    tipoEmpresa: TipoEmpresa.SAS,
     contribuyenteIva: true, liquidaIrae: true,
     irpfCat1: false, irpfCat2: true,
     empleadorBps: false, fonasa: true,
@@ -69,7 +69,7 @@ const SEED_CLIENTS = [
     nombre: 'Roberto', apellido: 'Pereira',
     razonSocial: 'Pereira Tech SRL',
     rut: '214567890', email: 'roberto@pereira.uy',
-    tipoEmpresa: 'SRL',
+    tipoEmpresa: TipoEmpresa.SRL,
     contribuyenteIva: true, liquidaIrae: true,
     irpfCat1: false, irpfCat2: true,
     empleadorBps: true, fonasa: true,
@@ -85,7 +85,7 @@ const SEED_CLIENTS = [
     nombre: 'Lucía', apellido: 'Suárez',
     razonSocial: 'Arq. Lucía Suárez',
     rut: '215678901', email: 'lucia@suarez.uy',
-    tipoEmpresa: 'Unipersonal',
+    tipoEmpresa: TipoEmpresa.UNIPERSONAL,
     contribuyenteIva: false, liquidaIrae: false,
     irpfCat1: true, irpfCat2: false,
     empleadorBps: false, fonasa: true,
@@ -101,7 +101,7 @@ const SEED_CLIENTS = [
     nombre: 'Carlos', apellido: 'Martínez',
     razonSocial: 'Dra. Martínez Consulting SA',
     rut: '216789012', email: 'carlos@martinez.uy',
-    tipoEmpresa: 'SA',
+    tipoEmpresa: TipoEmpresa.SA,
     contribuyenteIva: true, liquidaIrae: true,
     irpfCat1: false, irpfCat2: true,
     empleadorBps: true, fonasa: false,
@@ -110,7 +110,7 @@ const SEED_CLIENTS = [
     password: 'demo123',
     credenciales: [
       { plataforma: PlataformaCredencial.DGI,         usuario: 'cmartinez_sa',  password: 'sa_dgi2026' },
-      { plataforma: PlataformaCredencial.BANCO_REPUBLICA, usuario: 'cmartinez', password: 'brou_Carlos1', pin: '1234' },
+      { plataforma: PlataformaCredencial.BANCO,       usuario: 'cmartinez',     password: 'demo_banco_123', pin: '1234' },
     ],
   },
 ];
@@ -185,11 +185,15 @@ export async function runSeed(dataSource?: DataSource): Promise<void> {
       client = await clientRepo.save(clientRepo.create({
         ...clientData,
         contadorId: contador.id,
-        userId:     clientUser.id,
+        usuarioClienteId: clientUser.id,
       }));
       console.log(`  ✓  Cliente creado: ${c.nombre} ${c.apellido}`);
     } else {
       console.log(`  ⏭  Cliente ya existe: ${c.nombre} ${c.apellido}`);
+    }
+
+    if (!client) {
+      throw new Error(`Seed inconsistente: no se pudo obtener/crear el cliente ${c.email}`);
     }
 
     // ── Credenciales ────────────────────────────────────────────────────────
@@ -199,6 +203,7 @@ export async function runSeed(dataSource?: DataSource): Promise<void> {
         await credRepo.save(credRepo.create({
           clientId:          client.id,
           plataforma:        cred.plataforma,
+          nombrePlataforma:  cred.plataforma === PlataformaCredencial.BANCO ? 'BROU' : undefined,
           usuario:           cred.usuario,
           passwordEncriptado: encrypt(cred.password),
           pin:               cred.pin,
@@ -221,8 +226,8 @@ export async function runSeed(dataSource?: DataSource): Promise<void> {
           periodo,
           montoAcordado: c.honorario,
           montoCobrado:  pagado ? c.honorario : 0,
-          fechaCobro:    pagado ? new Date(d.getFullYear(), d.getMonth() + 1, 5) : null,
-          formaPago:     pagado ? FormaPago.TRANSFERENCIA : null,
+          fechaCobro:    pagado ? new Date(d.getFullYear(), d.getMonth() + 1, 5) : undefined,
+          formaPago:     pagado ? FormaPago.TRANSFERENCIA : undefined,
           estado:        pagado ? EstadoHonorario.AL_DIA : EstadoHonorario.PENDIENTE,
         }));
       }

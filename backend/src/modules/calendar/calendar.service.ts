@@ -71,7 +71,7 @@ export class CalendarService {
   // ── Regenerar para TODOS los clientes de un contador ──────────────────────
   async generarParaTodosLosClientes(contadorId: string, year?: number): Promise<{ clienteId: string; cantidad: number }[]> {
     const clientes = await this.clientRepo.find({ where: { contadorId } });
-    const resultados = [];
+    const resultados: Array<{ clienteId: string; cantidad: number }> = [];
 
     for (const cliente of clientes) {
       if (!cliente.rut) continue;

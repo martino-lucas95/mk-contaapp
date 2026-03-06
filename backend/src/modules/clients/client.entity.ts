@@ -72,13 +72,13 @@ export class Client {
   rut: string;
 
   @Column({ type: 'enum', enum: TipoEmpresa, nullable: true })
-  tipoEmpresa: TipoEmpresa;
+  tipoEmpresa: TipoEmpresa | null;
 
   @Column({ length: 200, nullable: true })
   giro: string;
 
   @Column({ type: 'date', nullable: true })
-  fechaInicioActividades: Date;
+  fechaInicioActividades: Date | null;
 
   // ── Perfil tributario ──────────────────────────────────────────────
   @Column({ default: false })

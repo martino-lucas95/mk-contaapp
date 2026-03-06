@@ -38,7 +38,7 @@ export class Credential {
 
   // Almacenado encriptado con AES-256 — nunca en texto plano
   @Column({ type: 'text', nullable: true })
-  passwordEncriptado: string;
+  passwordEncriptado: string | null;
 
   @Column({ length: 20, nullable: true })
   pin: string;

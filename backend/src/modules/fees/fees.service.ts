@@ -37,15 +37,16 @@ export class FeesService {
   }
 
   async create(clientId: string, dto: CreateHonorarioDto): Promise<Honorario> {
+    const montoCobrado = dto.montoCobrado ?? 0;
     const h = this.honorarioRepo.create({
       clientId,
       periodo:       dto.periodo,
       montoAcordado: dto.montoAcordado,
-      montoCobrado:  dto.montoCobrado ?? 0,
-      fechaCobro:    dto.fechaCobro ? new Date(dto.fechaCobro) : null,
+      montoCobrado,
+      fechaCobro:    dto.fechaCobro ? new Date(dto.fechaCobro) : undefined,
       formaPago:     dto.formaPago,
       notas:         dto.notas,
-      estado:        dto.montoCobrado >= dto.montoAcordado
+      estado:        montoCobrado >= dto.montoAcordado
                        ? EstadoHonorario.AL_DIA
                        : EstadoHonorario.PENDIENTE,
     });
