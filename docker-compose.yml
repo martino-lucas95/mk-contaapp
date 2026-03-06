@@ -1,0 +1,67 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: contaapp-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-contaapp}
+      POSTGRES_USER: ${DB_USER:-contaapp}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-contaapp_secret}
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${DB_USER:-contaapp}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: contaapp-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-contaapp}
+      DB_USER: ${DB_USER:-contaapp}
+      DB_PASSWORD: ${DB_PASSWORD:-contaapp_secret}
+      JWT_SECRET: ${JWT_SECRET:-change_this_jwt_secret}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-change_this_refresh_secret}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-change_this_32_char_key_minimum!}
+    ports:
+      - '3000:3000'
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: contaapp-web
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
+    ports:
+      - '5173:5173'
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
+volumes:
+  postgres_data:
