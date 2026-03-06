@@ -12,13 +12,13 @@ PROJECT_ROOT="$SCRIPT_DIR"
 if [ -f "$SCRIPT_DIR/versions.env" ]; then
     source "$SCRIPT_DIR/versions.env"
 else
-    echo "BACKEND_VERSION=1.0.0"  > "$SCRIPT_DIR/versions.env"
-    echo "FRONTEND_VERSION=1.0.0" >> "$SCRIPT_DIR/versions.env"
+    echo "BACKEND_VERSION=1.0.1"  > "$SCRIPT_DIR/versions.env"
+    echo "FRONTEND_VERSION=1.0.1" >> "$SCRIPT_DIR/versions.env"
     source "$SCRIPT_DIR/versions.env"
 fi
 
 NAMESPACE="contaapp"
-PRODUCTION_URL="https://contaapp.mkstudios.net"
+PRODUCTION_URL="https://contapp.mkstudios.net"
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; NC='\033[0m'
 log_info()    { echo -e "${BLUE}[INFO]${NC} $1"; }

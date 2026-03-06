@@ -1,6 +1,6 @@
 FROM node:20-alpine AS build
 WORKDIR /app
-ARG VITE_API_URL=https://contaapp.mkstudios.net
+ARG VITE_API_URL=https://contapp.mkstudios.net
 ENV VITE_API_URL=$VITE_API_URL
 COPY package*.json package-lock.json ./
 RUN npm ci
