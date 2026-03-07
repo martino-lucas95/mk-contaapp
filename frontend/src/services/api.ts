@@ -34,69 +34,70 @@ export default api;
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 export const authApi = {
-  login:   (email: string, password: string) => api.post('/auth/login', { email, password }),
-  refresh: (refreshToken: string)            => api.post('/auth/refresh', { refreshToken }),
+  login: (email: string, password: string) => api.post('/auth/login', { email, password }),
+  refresh: (refreshToken: string) => api.post('/auth/refresh', { refreshToken }),
 };
 
 // ── Users (admin) ─────────────────────────────────────────────────────────────
 export const usersApi = {
-  getAll:     ()                           => api.get('/users'),
-  create:     (data: any)                  => api.post('/users', data),
-  update:     (id: string, data: any)      => api.put(`/users/${id}`, data),
-  deactivate: (id: string)                 => api.delete(`/users/${id}`),
+  getAll: () => api.get('/users'),
+  create: (data: any) => api.post('/users', data),
+  update: (id: string, data: any) => api.put(`/users/${id}`, data),
+  deactivate: (id: string) => api.delete(`/users/${id}`),
 };
 
 // ── Clientes ──────────────────────────────────────────────────────────────────
 export const clientsApi = {
-  getAll:     ()                           => api.get('/clients'),
-  getOne:     (id: string)                 => api.get(`/clients/${id}`),
-  getMe:      ()                           => api.get('/clients/me'),
-  create:     (data: any)                  => api.post('/clients', data),
-  update:     (id: string, data: any)      => api.put(`/clients/${id}`, data),
-  deactivate: (id: string)                 => api.delete(`/clients/${id}`),
+  getAll: () => api.get('/clients'),
+  getOne: (id: string) => api.get(`/clients/${id}`),
+  getMe: () => api.get('/clients/me'),
+  create: (data: any) => api.post('/clients', data),
+  update: (id: string, data: any) => api.put(`/clients/${id}`, data),
+  deactivate: (id: string) => api.delete(`/clients/${id}`),
+  createUser: (id: string, data: any) => api.post(`/clients/${id}/user`, data),
 };
 
 // ── Calendario / Vencimientos ─────────────────────────────────────────────────
 export const calendarApi = {
-  getProximos:  ()                          => api.get('/calendar/proximos'),
-  getByClient:  (clientId: string)          => api.get(`/calendar/client/${clientId}`),
-  generar:      (clientId: string)          => api.post(`/calendar/client/${clientId}/generar`),
-  completar:    (id: string)                => api.patch(`/calendar/${id}/completar`),
+  getProximos: () => api.get('/calendar/proximos'),
+  getByClient: (clientId: string) => api.get(`/calendar/client/${clientId}`),
+  generar: (clientId: string) => api.post(`/calendar/client/${clientId}/generar`),
+  completar: (id: string) => api.patch(`/calendar/${id}/completar`),
 };
 
 // ── Credenciales ──────────────────────────────────────────────────────────────
 export const credentialsApi = {
-  getByClient: (clientId: string)          => api.get(`/credentials/client/${clientId}`),
-  reveal:      (id: string)                => api.get(`/credentials/${id}/reveal`),
-  create:      (data: any)                 => api.post('/credentials', data),
-  delete:      (id: string)                => api.delete(`/credentials/${id}`),
+  getByClient: (clientId: string) => api.get(`/credentials/client/${clientId}`),
+  reveal: (id: string) => api.get(`/credentials/${id}/reveal`),
+  create: (data: any) => api.post('/credentials', data),
+  delete: (id: string) => api.delete(`/credentials/${id}`),
 };
 
 // ── Honorarios ────────────────────────────────────────────────────────────────
 export const feesApi = {
-  getByClient: (clientId: string)          => api.get(`/fees/client/${clientId}`),
-  resumen:     ()                          => api.get('/fees/resumen'),
-  create:      (clientId: string, data: any) => api.post(`/fees/client/${clientId}`, data),
-  update:      (id: string, data: any)     => api.put(`/fees/${id}`, data),
-  marcarPago:  (id: string, data: any)     => api.patch(`/fees/${id}/pago`, data),
-  delete:      (id: string)               => api.delete(`/fees/${id}`),
+  getByClient: (clientId: string) => api.get(`/fees/client/${clientId}`),
+  resumen: () => api.get('/fees/resumen'),
+  create: (clientId: string, data: any) => api.post(`/fees/client/${clientId}`, data),
+  update: (id: string, data: any) => api.put(`/fees/${id}`, data),
+  marcarPago: (id: string, data: any) => api.patch(`/fees/${id}/pago`, data),
+  delete: (id: string) => api.delete(`/fees/${id}`),
 };
 
 // ── Movimientos ──────────────────────────────────────────────────────────────
 export const movementsApi = {
-  getByClient:       (clientId: string, params?: { tipo?: string; desde?: string; hasta?: string }) =>
+  getByClient: (clientId: string, params?: { tipo?: string; desde?: string; hasta?: string }) =>
     api.get(`/movements/client/${clientId}`, { params }),
-  resumenMensual:    (clientId: string, periodo: string) =>
+  resumenMensual: (clientId: string, periodo: string) =>
     api.get(`/movements/client/${clientId}/resumen/${periodo}`),
-  create:            (clientId: string, data: any) =>
+  create: (clientId: string, data: any) =>
     api.post(`/movements/client/${clientId}`, data),
-  update:            (id: string, data: any)      => api.put(`/movements/${id}`, data),
-  delete:            (id: string)                 => api.delete(`/movements/${id}`),
+  update: (id: string, data: any) => api.put(`/movements/${id}`, data),
+  delete: (id: string) => api.delete(`/movements/${id}`),
 };
 
 // ── Notificaciones ────────────────────────────────────────────────────────────
 export const notificationsApi = {
-  getAll:      ()                          => api.get('/notifications'),
-  unreadCount: ()                          => api.get('/notifications/unread-count'),
-  markAllRead: ()                          => api.patch('/notifications/read-all'),
+  getAll: () => api.get('/notifications'),
+  unreadCount: () => api.get('/notifications/unread-count'),
+  markAllRead: () => api.patch('/notifications/read-all'),
 };

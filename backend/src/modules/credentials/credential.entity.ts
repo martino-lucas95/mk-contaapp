@@ -11,6 +11,7 @@ export enum PlataformaCredencial {
   CJPPU = 'cjppu',
   FONASA = 'fonasa',
   BANCO = 'banco',
+  GUBUY = 'gub.uy',
   OTRO = 'otro',
 }
 

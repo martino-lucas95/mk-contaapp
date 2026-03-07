@@ -12,8 +12,8 @@ PROJECT_ROOT="$SCRIPT_DIR"
 if [ -f "$SCRIPT_DIR/versions.env" ]; then
     source "$SCRIPT_DIR/versions.env"
 else
-    echo "BACKEND_VERSION=1.0.8"  > "$SCRIPT_DIR/versions.env"
-    echo "FRONTEND_VERSION=1.0.8" >> "$SCRIPT_DIR/versions.env"
+    echo "BACKEND_VERSION=1.0.9"  > "$SCRIPT_DIR/versions.env"
+    echo "FRONTEND_VERSION=1.0.9" >> "$SCRIPT_DIR/versions.env"
     source "$SCRIPT_DIR/versions.env"
 fi
 
@@ -176,7 +176,7 @@ show_help() {
     echo "  3. ./deploy.sh seed        # crea todos los usuarios demo"
     echo ""
     echo "Actualización:"
-    echo "  1. Editar versions.env  (ej: BACKEND_VERSION=1.0.8)"
+    echo "  1. Editar versions.env  (ej: BACKEND_VERSION=1.0.9)"
     echo "  2. ./deploy.sh build"
     echo "  3. ./deploy.sh update"
     echo ""

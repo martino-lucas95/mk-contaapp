@@ -1,9 +1,18 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { IsString, IsOptional, IsEmail, IsBoolean } from 'class-validator';
 import { Client, EstadoCliente, TipoEmpresa } from './client.entity';
 import { UserRole } from '../users/user.entity';
+import { UsersService } from '../users/users.service';
+
+export class CreateClientUserDto {
+  @IsEmail()
+  email: string;
+
+  @IsString()
+  password: string;
+}
 
 export class CreateClientDto {
   @IsString()
@@ -78,7 +87,8 @@ function parseTipoEmpresa(value?: string): TipoEmpresa | undefined {
 export class ClientsService {
   constructor(
     @InjectRepository(Client) private clientRepo: Repository<Client>,
-  ) {}
+    private usersService: UsersService,
+  ) { }
 
   async findAll(userId: string, userRole: UserRole): Promise<Client[]> {
     const query = this.clientRepo.createQueryBuilder('client')
@@ -140,6 +150,22 @@ export class ClientsService {
   async deactivate(id: string, userId: string, userRole: UserRole): Promise<Client> {
     const client = await this.findOne(id, userId, userRole);
     client.estado = EstadoCliente.INACTIVO;
+    return this.clientRepo.save(client);
+  }
+
+  async createUserForClient(id: string, dto: CreateClientUserDto, userId: string, userRole: UserRole): Promise<Client> {
+    const client = await this.findOne(id, userId, userRole);
+    if (client.usuarioClienteId) {
+      throw new ConflictException('El cliente ya tiene un usuario asignado');
+    }
+    const user = await this.usersService.create({
+      email: dto.email,
+      password: dto.password,
+      nombre: client.nombre,
+      apellido: client.apellido,
+      role: UserRole.CLIENTE,
+    });
+    client.usuarioClienteId = user.id;
     return this.clientRepo.save(client);
   }
 

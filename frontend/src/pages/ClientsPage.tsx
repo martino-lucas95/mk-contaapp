@@ -56,20 +56,20 @@ const TIPO_EMPRESA_LABEL: Record<TipoEmpresa, string> = {
 };
 
 const ESTADO_COLORS: Record<EstadoCliente, { bg: string; color: string; dot: string }> = {
-  activo:     { bg: '#DCFCE7', color: '#15803D', dot: '#22C55E' },
-  inactivo:   { bg: '#F1F5F9', color: '#64748B', dot: '#94A3B8' },
+  activo: { bg: '#DCFCE7', color: '#15803D', dot: '#22C55E' },
+  inactivo: { bg: '#F1F5F9', color: '#64748B', dot: '#94A3B8' },
   suspendido: { bg: '#FEF3C7', color: '#D97706', dot: '#F59E0B' },
 };
 
 const TRIBUTOS_LABELS: { key: keyof PerfilTributario; label: string }[] = [
-  { key: 'contribuyenteIva',  label: 'IVA' },
-  { key: 'liquidaIrae',       label: 'IRAE' },
-  { key: 'irpfCat1',          label: 'IRPF Cat.I' },
-  { key: 'irpfCat2',          label: 'IRPF Cat.II' },
-  { key: 'empleadorBps',      label: 'BPS Patr.' },
-  { key: 'fonasa',            label: 'FONASA' },
-  { key: 'cjppu',             label: 'CJPPU' },
-  { key: 'fondoSolidaridad',  label: 'F.Sol.' },
+  { key: 'contribuyenteIva', label: 'IVA' },
+  { key: 'liquidaIrae', label: 'IRAE' },
+  { key: 'irpfCat1', label: 'IRPF Cat.I' },
+  { key: 'irpfCat2', label: 'IRPF Cat.II' },
+  { key: 'empleadorBps', label: 'BPS Patr.' },
+  { key: 'fonasa', label: 'FONASA' },
+  { key: 'cjppu', label: 'CJPPU' },
+  { key: 'fondoSolidaridad', label: 'F.Sol.' },
 ];
 
 const EMPTY_FORM = {
@@ -78,6 +78,7 @@ const EMPTY_FORM = {
   giro: '', fechaInicioActividades: '', notas: '',
   contribuyenteIva: false, liquidaIrae: false, irpfCat1: false, irpfCat2: false,
   empleadorBps: false, fonasa: false, cjppu: false, fondoSolidaridad: false,
+  crearUsuario: false, userPassword: '',
 };
 
 type FormData = typeof EMPTY_FORM;
@@ -117,16 +118,16 @@ function Field({
 }
 
 function CheckField({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
+  const id = `chk-${label.replace(/\\s/g, '-')}`;
   return (
     <div
       className={cn(
-        'flex items-center gap-2 rounded-lg border p-3 cursor-pointer transition-colors',
+        'flex items-center gap-2 rounded-lg border p-3 transition-colors',
         checked ? 'border-primary/50 bg-primary/5' : 'border-border'
       )}
-      onClick={() => onChange(!checked)}
     >
-      <Checkbox checked={checked} onCheckedChange={(v) => onChange(!!v)} />
-      <Label className="cursor-pointer text-sm font-medium">{label}</Label>
+      <Checkbox id={id} checked={checked} onCheckedChange={(v) => onChange(!!v)} type="button" />
+      <Label htmlFor={id} className="cursor-pointer text-sm font-medium leading-none">{label}</Label>
     </div>
   );
 }
@@ -174,11 +175,18 @@ function ClientModal({
         nombre: (form.nombre ?? '').trim() || (form.razonSocial ?? '').trim() || 'Sin nombre',
         apellido: (form.apellido ?? '').trim() || '-',
       };
+      let finalId = editId;
       if (editId) {
         await clientsApi.update(editId, payload);
       } else {
-        await clientsApi.create(payload);
+        const { data } = await clientsApi.create(payload);
+        finalId = data.id;
       }
+      
+      if (form.crearUsuario && finalId && form.email && form.userPassword) {
+        await clientsApi.createUser(finalId, { email: form.email, password: form.userPassword });
+      }
+
       onSave();
       onClose();
     } catch (err: any) {
@@ -249,7 +257,22 @@ function ClientModal({
                 <Field label="Teléfono" value={form.telefono} onChange={set('telefono')} placeholder="098 000 000" />
               </div>
               <Field label="Email" type="email" value={form.email} onChange={set('email')} />
-              <div className="space-y-2">
+              {(form.email.length > 3) && (
+                <div className="mt-2 space-y-3">
+                  <CheckField
+                    label="Habilitar acceso al portal de cliente"
+                    checked={form.crearUsuario as boolean}
+                    onChange={v => setForm(f => ({ ...f, crearUsuario: v }))}
+                  />
+                  {form.crearUsuario && (
+                    <div className="ml-1 pl-4 border-l-2 border-primary/20">
+                      <Field label="Contraseña para el cliente" value={form.userPassword as string} onChange={set('userPassword')} required placeholder="Mínimo 6 caracteres" />
+                      <p className="mt-1 text-xs text-muted-foreground">El usuario será el correo electrónico proporcionado arriba.</p>
+                    </div>
+                  )}
+                </div>
+              )}
+              <div className="space-y-2 mt-3">
                 <Label>Notas</Label>
                 <Textarea value={form.notas} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))} rows={2} placeholder="Observaciones adicionales..." />
               </div>
@@ -327,6 +350,7 @@ export default function ClientsPage() {
     contribuyenteIva: c.contribuyenteIva, liquidaIrae: c.liquidaIrae,
     irpfCat1: c.irpfCat1, irpfCat2: c.irpfCat2, empleadorBps: c.empleadorBps,
     fonasa: c.fonasa, cjppu: c.cjppu, fondoSolidaridad: c.fondoSolidaridad,
+    crearUsuario: false, userPassword: '',
   });
 
   return (

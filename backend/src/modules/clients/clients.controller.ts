@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Put, Delete, Param, Body, UseGuards, Request } from '@nestjs/common';
-import { ClientsService, CreateClientDto } from './clients.service';
+import { ClientsService, CreateClientDto, CreateClientUserDto } from './clients.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard, Roles } from '../../common/guards/roles.guard';
 import { UserRole } from '../users/user.entity';
@@ -7,7 +7,7 @@ import { UserRole } from '../users/user.entity';
 @Controller('clients')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class ClientsController {
-  constructor(private clientsService: ClientsService) {}
+  constructor(private clientsService: ClientsService) { }
 
   @Get()
   findAll(@Request() req) {
@@ -35,5 +35,11 @@ export class ClientsController {
   @Roles(UserRole.ADMIN, UserRole.CONTADOR)
   deactivate(@Param('id') id: string, @Request() req) {
     return this.clientsService.deactivate(id, req.user.id, req.user.role);
+  }
+
+  @Post(':id/user')
+  @Roles(UserRole.ADMIN, UserRole.CONTADOR)
+  createUser(@Param('id') id: string, @Body() dto: CreateClientUserDto, @Request() req) {
+    return this.clientsService.createUserForClient(id, dto, req.user.id, req.user.role);
   }
 }

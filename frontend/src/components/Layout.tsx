@@ -67,9 +67,9 @@ const ROLE_LABEL: Record<UserRole, string> = {
 
 const linkClass = ({ isActive }: { isActive: boolean }) =>
   cn(
-    'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+    'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200',
     isActive
-      ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+      ? 'bg-sidebar-accent text-sidebar-foreground shadow-sm'
       : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
   );
 
@@ -110,7 +110,7 @@ function ThemeSwitcher({ collapsed }: { collapsed: boolean }) {
 
 function BottomNav({ navItems }: { navItems: NavItem[] }) {
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 flex border-t border-sidebar-border bg-sidebar pb-[env(safe-area-inset-bottom)]">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 flex border-t border-sidebar-border/50 bg-sidebar/85 backdrop-blur-xl pb-[env(safe-area-inset-bottom)]">
       {navItems.map((item) => (
         <NavLink
           key={item.to}
@@ -119,7 +119,7 @@ function BottomNav({ navItems }: { navItems: NavItem[] }) {
           className={({ isActive }) =>
             cn(
               'flex flex-1 flex-col items-center justify-center gap-1 px-2 py-2 text-[10px] font-medium transition-colors',
-              isActive ? 'text-sidebar-foreground' : 'text-sidebar-foreground/60'
+              isActive ? 'text-primary' : 'text-sidebar-foreground/60 hover:text-sidebar-foreground'
             )
           }
         >
@@ -133,14 +133,14 @@ function BottomNav({ navItems }: { navItems: NavItem[] }) {
 
 function MobileHeader({ onMenuOpen }: { onMenuOpen: () => void }) {
   return (
-    <header className="fixed left-0 right-0 top-0 z-50 flex h-14 items-center justify-between border-b border-sidebar-border bg-sidebar px-4 pt-[env(safe-area-inset-top)]">
+    <header className="fixed left-0 right-0 top-0 z-50 flex h-14 items-center justify-between border-b border-sidebar-border/50 bg-sidebar/85 backdrop-blur-xl px-4 pt-[env(safe-area-inset-top)]">
       <div className="flex items-center gap-2">
-        <div className="flex size-7 items-center justify-center rounded-lg bg-primary font-bold text-primary-foreground text-xs">
+        <div className="flex size-7 items-center justify-center rounded-lg bg-primary font-bold text-primary-foreground text-xs shadow-sm">
           C
         </div>
         <span className="font-bold text-sidebar-foreground">ContaApp</span>
       </div>
-      <Button variant="ghost" size="icon" onClick={onMenuOpen} className="text-sidebar-foreground">
+      <Button variant="ghost" size="icon" onClick={onMenuOpen} className="text-sidebar-foreground hover:bg-sidebar-accent/50">
         <Menu className="size-5" />
       </Button>
     </header>
@@ -279,8 +279,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     <div className="flex h-screen overflow-hidden bg-background">
       <aside
         className={cn(
-          'flex shrink-0 flex-col border-r border-sidebar-border bg-sidebar transition-[width] duration-200 ease-out',
-          collapsed ? 'w-16' : 'w-56'
+          'flex shrink-0 flex-col border-r border-sidebar-border/50 bg-sidebar transition-[width] duration-300 ease-in-out',
+          collapsed ? 'w-16' : 'w-60'
         )}
       >
         <div className="flex min-h-[60px] items-center justify-between border-b border-sidebar-border px-4">
