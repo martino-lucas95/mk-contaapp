@@ -26,7 +26,10 @@ const Icons = {
   chevron:     <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>,
   palette:     <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 0 20c-2.76 0-3-1.5-3-3 0-2 1-3 1-5s-1-3-1-5a5 5 0 0 1 3-7z"/></svg>,
   menu:        <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>,
-  close:       <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
+  close:         <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
+  notifications:  <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>,
+  honorarios:     <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>,
+  movimientos:    <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>,
 };
 
 const NAV_ADMIN    = [
@@ -34,10 +37,13 @@ const NAV_ADMIN    = [
   { to: '/admin/contadores', label: 'Contadores',  icon: Icons.users },
 ];
 const NAV_CONTADOR = [
-  { to: '/',            label: 'Dashboard',    icon: Icons.dashboard,   exact: true },
-  { to: '/clients',     label: 'Clientes',     icon: Icons.clients },
-  { to: '/calendar',    label: 'Vencimientos', icon: Icons.calendar },
-  { to: '/credentials', label: 'Credenciales', icon: Icons.credentials },
+  { to: '/dashboard',      label: 'Dashboard',    icon: Icons.dashboard },
+  { to: '/clients',        label: 'Clientes',     icon: Icons.clients },
+  { to: '/calendar',       label: 'Vencimientos', icon: Icons.calendar },
+  { to: '/credentials',    label: 'Credenciales', icon: Icons.credentials },
+  { to: '/honorarios',     label: 'Honorarios',   icon: Icons.honorarios },
+  { to: '/movimientos',    label: 'Movimientos',  icon: Icons.movimientos },
+  { to: '/notifications',  label: 'Notificaciones', icon: Icons.notifications },
 ];
 
 const ROLE_LABEL: Record<UserRole, string> = {

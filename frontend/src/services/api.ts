@@ -50,6 +50,7 @@ export const usersApi = {
 export const clientsApi = {
   getAll:     ()                           => api.get('/clients'),
   getOne:     (id: string)                 => api.get(`/clients/${id}`),
+  getMe:      ()                           => api.get('/clients/me'),
   create:     (data: any)                  => api.post('/clients', data),
   update:     (id: string, data: any)      => api.put(`/clients/${id}`, data),
   deactivate: (id: string)                 => api.delete(`/clients/${id}`),
@@ -79,6 +80,18 @@ export const feesApi = {
   update:      (id: string, data: any)     => api.put(`/fees/${id}`, data),
   marcarPago:  (id: string, data: any)     => api.patch(`/fees/${id}/pago`, data),
   delete:      (id: string)               => api.delete(`/fees/${id}`),
+};
+
+// ── Movimientos ──────────────────────────────────────────────────────────────
+export const movementsApi = {
+  getByClient:       (clientId: string, params?: { tipo?: string; desde?: string; hasta?: string }) =>
+    api.get(`/movements/client/${clientId}`, { params }),
+  resumenMensual:    (clientId: string, periodo: string) =>
+    api.get(`/movements/client/${clientId}/resumen/${periodo}`),
+  create:            (clientId: string, data: any) =>
+    api.post(`/movements/client/${clientId}`, data),
+  update:            (id: string, data: any)      => api.put(`/movements/${id}`, data),
+  delete:            (id: string)                 => api.delete(`/movements/${id}`),
 };
 
 // ── Notificaciones ────────────────────────────────────────────────────────────

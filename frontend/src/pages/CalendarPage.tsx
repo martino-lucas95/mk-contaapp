@@ -22,13 +22,28 @@ export default function CalendarPage() {
   const [loading, setLoading] = useState(true);
   const [filtroEstado, setFiltroEstado] = useState<EstadoVencimiento | 'todos'>('todos');
   const [filtroMes, setFiltroMes] = useState<number | 'todos'>('todos');
+  const [completando, setCompletando] = useState<string | null>(null);
 
-  useEffect(() => {
+  const loadVencimientos = () => {
+    setLoading(true);
     calendarApi.getProximos()
       .then(({ data }) => setVencimientos(data))
       .catch(() => setVencimientos([]))
       .finally(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(() => { loadVencimientos(); }, []);
+
+  const handleCompletar = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    setCompletando(id);
+    try {
+      await calendarApi.completar(id);
+      setVencimientos(vs => vs.map(v => v.id === id ? { ...v, estado: 'completado' as EstadoVencimiento } : v));
+    } finally {
+      setCompletando(null);
+    }
+  };
 
   const filtered = vencimientos.filter(v => {
     if (filtroEstado !== 'todos' && v.estado !== filtroEstado) return false;
@@ -125,7 +140,7 @@ export default function CalendarPage() {
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: '#F8FAFC' }}>
-                    {['Cliente', 'Obligación', 'Fecha', 'Estado'].map(h => (
+                    {['Cliente', 'Obligación', 'Fecha', 'Estado', ''].map(h => (
                       <th key={h} style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
                     ))}
                   </tr>
@@ -162,6 +177,24 @@ export default function CalendarPage() {
                             <span style={{ width: 6, height: 6, borderRadius: '50%', background: c.dot, display: 'inline-block' }} />
                             {v.estado.charAt(0).toUpperCase() + v.estado.slice(1)}
                           </span>
+                        </td>
+                        <td style={{ padding: '12px 16px' }} onClick={e => e.stopPropagation()}>
+                          {v.estado !== 'completado' && (
+                            <button
+                              onClick={e => handleCompletar(e, v.id)}
+                              disabled={completando === v.id}
+                              title="Marcar como completado"
+                              style={{
+                                padding: '4px 10px', borderRadius: 6, border: 'none',
+                                background: '#DCFCE7', color: '#15803D',
+                                fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                                opacity: completando === v.id ? 0.6 : 1,
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              {completando === v.id ? '...' : '✓ Completar'}
+                            </button>
+                          )}
                         </td>
                       </tr>
                     );

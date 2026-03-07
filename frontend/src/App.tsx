@@ -12,6 +12,12 @@ import ClientsPage       from './pages/ClientsPage';
 import ClientDetailPage  from './pages/ClientDetailPage';
 import CalendarPage      from './pages/CalendarPage';
 import CredentialsPage   from './pages/CredentialsPage';
+import HonorariosPage    from './pages/HonorariosPage';
+import NotificationsPage from './pages/NotificationsPage';
+import MovimientosPage   from './pages/MovimientosPage';
+
+// Portal cliente
+import ClientPortalPage  from './pages/ClientPortalPage';
 
 // Login
 import LoginPage from './pages/LoginPage';
@@ -33,6 +39,7 @@ function RootRedirect() {
   const user = useAuthStore((s) => s.user);
   if (!user) return <Navigate to="/login" replace />;
   if (user.role === 'admin') return <Navigate to="/admin" replace />;
+  if (user.role === 'cliente') return <Navigate to="/portal" replace />;
   return <Navigate to="/dashboard" replace />;
 }
 
@@ -84,6 +91,28 @@ export default function App() {
           <RequireAuth>
             <Layout><CredentialsPage /></Layout>
           </RequireAuth>
+        }/>
+        <Route path="/honorarios" element={
+          <RequireAuth>
+            <Layout><HonorariosPage /></Layout>
+          </RequireAuth>
+        }/>
+        <Route path="/notifications" element={
+          <RequireAuth>
+            <Layout><NotificationsPage /></Layout>
+          </RequireAuth>
+        }/>
+        <Route path="/movimientos" element={
+          <RequireAuth>
+            <Layout><MovimientosPage /></Layout>
+          </RequireAuth>
+        }/>
+
+        {/* ── Portal cliente ── */}
+        <Route path="/portal" element={
+          <RequireAuth><RequireRole role="cliente">
+            <Layout><ClientPortalPage /></Layout>
+          </RequireRole></RequireAuth>
         }/>
 
         <Route path="*" element={<RootRedirect />} />

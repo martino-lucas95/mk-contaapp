@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { clientsApi, calendarApi, credentialsApi, feesApi } from '../services/api';
+import { clientsApi, calendarApi, credentialsApi, feesApi, movementsApi } from '../services/api';
 import { useThemeStore } from '../store/theme.store';
-import { Client, Vencimiento, Credential, Honorario, EstadoVencimiento, PlataformaCredencial, FormaPago } from '../types';
+import { Client, Vencimiento, Credential, Honorario, Movimiento, TipoMovimiento, EstadoVencimiento, PlataformaCredencial, FormaPago } from '../types';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const ESTADO_VENC_COLORS: Record<EstadoVencimiento, { bg: string; color: string }> = {
@@ -33,14 +33,14 @@ const PLATAFORMA_COLORS: Record<PlataformaCredencial, string> = {
 };
 
 // ── Tab Button ─────────────────────────────────────────────────────────────────
-const TabBtn = ({ label, active, onClick, count }: { label: string; active: boolean; onClick: () => void; count?: number }) => (
+const TabBtn = ({ label, active, onClick, count, theme }: { label: string; active: boolean; onClick: () => void; count?: number; theme: any }) => (
   <button
     onClick={onClick}
     style={{
       padding: '9px 18px', borderRadius: '8px 8px 0 0', border: 'none',
-      background: active ? '#fff' : 'transparent',
-      borderBottom: active ? '2px solid #6D28D9' : '2px solid transparent',
-      color: active ? '#6D28D9' : '#64748B',
+      background: active ? theme.cardBg : 'transparent',
+      borderBottom: active ? `2px solid ${theme.accent}` : '2px solid transparent',
+      color: active ? theme.accentText : theme.textMuted,
       fontWeight: active ? 600 : 400, fontSize: 14, cursor: 'pointer',
       display: 'flex', alignItems: 'center', gap: 6,
     }}
@@ -48,8 +48,8 @@ const TabBtn = ({ label, active, onClick, count }: { label: string; active: bool
     {label}
     {count !== undefined && (
       <span style={{
-        background: active ? '#EDE9FE' : '#F1F5F9',
-        color: active ? '#6D28D9' : '#94A3B8',
+        background: active ? theme.accentLight : theme.tableHeaderBg,
+        color: active ? theme.accentText : theme.textMuted,
         borderRadius: 10, padding: '1px 7px', fontSize: 11, fontWeight: 600,
       }}>{count}</span>
     )}
@@ -57,11 +57,11 @@ const TabBtn = ({ label, active, onClick, count }: { label: string; active: bool
 );
 
 // ── InfoRow ────────────────────────────────────────────────────────────────────
-const InfoRow = ({ label, value }: { label: string; value?: string | null }) =>
+const InfoRow = ({ label, value, theme }: { label: string; value?: string | null; theme?: any }) =>
   value ? (
     <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-      <span style={{ fontSize: 13, color: '#94A3B8', minWidth: 130 }}>{label}</span>
-      <span style={{ fontSize: 13, color: '#0F172A', fontWeight: 500 }}>{value}</span>
+      <span style={{ fontSize: 13, color: theme?.textMuted ?? '#94A3B8', minWidth: 130 }}>{label}</span>
+      <span style={{ fontSize: 13, color: theme?.textPrimary ?? '#0F172A', fontWeight: 500 }}>{value}</span>
     </div>
   ) : null;
 
@@ -75,8 +75,9 @@ export default function ClientDetailPage() {
   const [vencimientos, setVencimientos] = useState<Vencimiento[]>([]);
   const [credentials, setCredentials] = useState<Credential[]>([]);
   const [honorarios, setHonorarios] = useState<Honorario[]>([]);
+  const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<'info' | 'vencimientos' | 'credenciales' | 'honorarios'>('info');
+  const [tab, setTab] = useState<'info' | 'vencimientos' | 'credenciales' | 'honorarios' | 'movimientos'>('info');
 
   // ── Honorarios state ──
   const [showHonModal, setShowHonModal] = useState(false);
@@ -86,6 +87,15 @@ export default function ClientDetailPage() {
   const [pagoForm, setPagoForm] = useState({ montoCobrado: '', fechaCobro: '', formaPago: 'transferencia' as FormaPago, notas: '' });
   const [savingHon, setSavingHon] = useState(false);
   const [honError, setHonError]   = useState('');
+
+  // movimientos state
+  const [showMovModal, setShowMovModal] = useState(false);
+  const [movEditId, setMovEditId] = useState<string | null>(null);
+  const [movForm, setMovForm] = useState({ tipo: 'venta' as TipoMovimiento, fecha: '', descripcion: '', monto: '', ivaIncluido: true, tasaIva: '22', nroComprobante: '', notas: '' });
+  const [savingMov, setSavingMov] = useState(false);
+  const [movError, setMovError] = useState('');
+  const [movFiltroTipo, setMovFiltroTipo] = useState<TipoMovimiento | ''>('');
+  const [movResumen, setMovResumen] = useState<any>(null);
 
   // credential reveal
   const [revealed, setRevealed] = useState<Record<string, string>>({});
@@ -104,11 +114,13 @@ export default function ClientDetailPage() {
       calendarApi.getByClient(id),
       credentialsApi.getByClient(id),
       feesApi.getByClient(id),
-    ]).then(([c, v, cr, h]) => {
+      movementsApi.getByClient(id),
+    ]).then(([c, v, cr, h, m]) => {
       setClient(c.data);
       setVencimientos(v.data);
       setCredentials(cr.data);
       setHonorarios(h.data);
+      setMovimientos(m.data);
     }).catch(() => navigate('/clients'))
       .finally(() => setLoading(false));
   }, [id]);
@@ -232,19 +244,90 @@ export default function ClientDetailPage() {
     setHonorarios(hs => hs.filter(h => h.id !== honId));
   };
 
+  // ── Movimientos handlers ──
+  const openNewMov = () => {
+    setMovForm({ tipo: 'venta', fecha: new Date().toISOString().slice(0, 10), descripcion: '', monto: '', ivaIncluido: true, tasaIva: '22', nroComprobante: '', notas: '' });
+    setMovEditId(null);
+    setMovError('');
+    setShowMovModal(true);
+  };
+
+  const openEditMov = (m: Movimiento) => {
+    setMovForm({
+      tipo: m.tipo,
+      fecha: m.fecha.slice(0, 10),
+      descripcion: m.descripcion ?? '',
+      monto: String(m.monto),
+      ivaIncluido: m.ivaIncluido,
+      tasaIva: String(m.tasaIva ?? 22),
+      nroComprobante: m.nroComprobante ?? '',
+      notas: m.notas ?? '',
+    });
+    setMovEditId(m.id);
+    setMovError('');
+    setShowMovModal(true);
+  };
+
+  const handleSaveMov = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!id) return;
+    setSavingMov(true); setMovError('');
+    try {
+      const payload = {
+        tipo: movForm.tipo,
+        fecha: movForm.fecha,
+        descripcion: movForm.descripcion || undefined,
+        monto: parseFloat(movForm.monto),
+        ivaIncluido: movForm.ivaIncluido,
+        tasaIva: movForm.tipo === 'gasto' ? undefined : parseFloat(movForm.tasaIva),
+        nroComprobante: movForm.nroComprobante || undefined,
+        notas: movForm.notas || undefined,
+      };
+      if (movEditId) {
+        await movementsApi.update(movEditId, payload);
+      } else {
+        await movementsApi.create(id, payload);
+      }
+      const { data } = await movementsApi.getByClient(id);
+      setMovimientos(data);
+      // refrescar resumen del mes actual si ya está cargado
+      if (movResumen) {
+        const periodo = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+        const { data: r } = await movementsApi.resumenMensual(id, periodo);
+        setMovResumen(r);
+      }
+      setShowMovModal(false);
+    } catch (err: any) {
+      setMovError(err?.response?.data?.message || 'Error al guardar');
+    } finally { setSavingMov(false); }
+  };
+
+  const handleDeleteMov = async (movId: string) => {
+    if (!confirm('¿Eliminar este movimiento?') || !id) return;
+    await movementsApi.delete(movId);
+    setMovimientos(ms => ms.filter(m => m.id !== movId));
+  };
+
+  const cargarResumenMes = async () => {
+    if (!id) return;
+    const periodo = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+    const { data } = await movementsApi.resumenMensual(id, periodo);
+    setMovResumen(data);
+  };
+
   if (loading) return <div style={{ padding: 48, textAlign: 'center', color: '#94A3B8' }}>Cargando...</div>;
   if (!client) return null;
 
   const vencProximos = vencimientos.filter(v => v.estado === 'pendiente' || v.estado === 'alertado').length;
 
   return (
-    <div style={{ padding: '28px 32px', maxWidth: 960 }}>
+    <div style={{ padding: '28px 32px', maxWidth: 960, background: theme.mainBg, minHeight: '100%' }}>
 
       {/* Breadcrumb */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20, fontSize: 13, color: '#94A3B8' }}>
-        <Link to="/clients" style={{ color: '#6D28D9', textDecoration: 'none', fontWeight: 500 }}>Clientes</Link>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20, fontSize: 13, color: theme.textMuted }}>
+        <Link to="/clients" style={{ color: theme.accentText, textDecoration: 'none', fontWeight: 500 }}>Clientes</Link>
         <span>/</span>
-        <span style={{ color: '#0F172A' }}>{client.nombre} {client.apellido}</span>
+        <span style={{ color: theme.textPrimary }}>{client.nombre} {client.apellido}</span>
       </div>
 
       {/* Header */}
@@ -252,18 +335,18 @@ export default function ClientDetailPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <div style={{
             width: 52, height: 52, borderRadius: '50%',
-            background: '#EDE9FE', color: '#6D28D9',
+            background: theme.accentLight, color: theme.accentText,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 18, fontWeight: 700,
           }}>
             {client.nombre[0]}{client.apellido[0]}
           </div>
           <div>
-            <h1 style={{ fontSize: 22, fontWeight: 700, color: '#0F172A', marginBottom: 2 }}>
+            <h1 style={{ fontSize: 22, fontWeight: 700, color: theme.textPrimary, marginBottom: 2 }}>
               {client.nombre} {client.apellido}
             </h1>
-            {client.razonSocial && <div style={{ fontSize: 13, color: '#64748B' }}>{client.razonSocial}</div>}
-            {client.rut && <div style={{ fontSize: 12, color: '#94A3B8' }}>RUT: {client.rut}</div>}
+            {client.razonSocial && <div style={{ fontSize: 13, color: theme.textSecondary }}>{client.razonSocial}</div>}
+            {client.rut && <div style={{ fontSize: 12, color: theme.textMuted }}>RUT: {client.rut}</div>}
           </div>
         </div>
         <span style={{
@@ -276,33 +359,34 @@ export default function ClientDetailPage() {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 2, borderBottom: '1px solid #E2E8F0', marginBottom: 24 }}>
-        <TabBtn label="Información" active={tab === 'info'} onClick={() => setTab('info')} />
-        <TabBtn label="Vencimientos" active={tab === 'vencimientos'} onClick={() => setTab('vencimientos')} count={vencProximos || undefined} />
-        <TabBtn label="Credenciales" active={tab === 'credenciales'} onClick={() => setTab('credenciales')} count={credentials.length || undefined} />
-        <TabBtn label="Honorarios" active={tab === 'honorarios'} onClick={() => setTab('honorarios')} count={honorarios.length || undefined} />
+      <div style={{ display: 'flex', gap: 2, borderBottom: `1px solid ${theme.cardBorder}`, marginBottom: 24 }}>
+        <TabBtn theme={theme} label="Información" active={tab === 'info'} onClick={() => setTab('info')} />
+        <TabBtn theme={theme} label="Vencimientos" active={tab === 'vencimientos'} onClick={() => setTab('vencimientos')} count={vencProximos || undefined} />
+        <TabBtn theme={theme} label="Credenciales" active={tab === 'credenciales'} onClick={() => setTab('credenciales')} count={credentials.length || undefined} />
+        <TabBtn theme={theme} label="Honorarios" active={tab === 'honorarios'} onClick={() => setTab('honorarios')} count={honorarios.length || undefined} />
+        <TabBtn theme={theme} label="Movimientos" active={tab === 'movimientos'} onClick={() => { setTab('movimientos'); if (!movResumen) cargarResumenMes(); }} count={movimientos.length || undefined} />
       </div>
 
       {/* ── TAB: INFO ── */}
       {tab === 'info' && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-          <div style={{ background: '#fff', borderRadius: 12, padding: '20px 24px', boxShadow: '0 1px 3px rgba(0,0,0,0.07)' }}>
-            <h3 style={{ fontSize: 14, fontWeight: 600, color: '#0F172A', marginBottom: 16 }}>📋 Datos personales</h3>
-            <InfoRow label="CI" value={client.ci} />
-            <InfoRow label="Email" value={client.email} />
-            <InfoRow label="Teléfono" value={client.telefono} />
-            <InfoRow label="Dirección" value={client.direccion} />
+          <div style={{ background: theme.cardBg, borderRadius: 12, padding: '20px 24px', boxShadow: theme.cardShadow, border: `1px solid ${theme.cardBorder}` }}>
+            <h3 style={{ fontSize: 14, fontWeight: 600, color: theme.textPrimary, marginBottom: 16 }}>📋 Datos personales</h3>
+            <InfoRow theme={theme} label="CI" value={client.ci} />
+            <InfoRow theme={theme} label="Email" value={client.email} />
+            <InfoRow theme={theme} label="Teléfono" value={client.telefono} />
+            <InfoRow theme={theme} label="Dirección" value={client.direccion} />
           </div>
-          <div style={{ background: '#fff', borderRadius: 12, padding: '20px 24px', boxShadow: '0 1px 3px rgba(0,0,0,0.07)' }}>
-            <h3 style={{ fontSize: 14, fontWeight: 600, color: '#0F172A', marginBottom: 16 }}>🏢 Datos empresa</h3>
-            <InfoRow label="Razón social" value={client.razonSocial} />
-            <InfoRow label="RUT" value={client.rut} />
-            <InfoRow label="Tipo empresa" value={client.tipoEmpresa ?? undefined} />
-            <InfoRow label="Giro" value={client.giro} />
-            <InfoRow label="Inicio actividades" value={client.fechaInicioActividades ? new Date(client.fechaInicioActividades).toLocaleDateString('es-UY') : undefined} />
+          <div style={{ background: theme.cardBg, borderRadius: 12, padding: '20px 24px', boxShadow: theme.cardShadow, border: `1px solid ${theme.cardBorder}` }}>
+            <h3 style={{ fontSize: 14, fontWeight: 600, color: theme.textPrimary, marginBottom: 16 }}>🏢 Datos empresa</h3>
+            <InfoRow theme={theme} label="Razón social" value={client.razonSocial} />
+            <InfoRow theme={theme} label="RUT" value={client.rut} />
+            <InfoRow theme={theme} label="Tipo empresa" value={client.tipoEmpresa ?? undefined} />
+            <InfoRow theme={theme} label="Giro" value={client.giro} />
+            <InfoRow theme={theme} label="Inicio actividades" value={client.fechaInicioActividades ? new Date(client.fechaInicioActividades).toLocaleDateString('es-UY') : undefined} />
           </div>
-          <div style={{ background: '#fff', borderRadius: 12, padding: '20px 24px', boxShadow: '0 1px 3px rgba(0,0,0,0.07)', gridColumn: '1 / -1' }}>
-            <h3 style={{ fontSize: 14, fontWeight: 600, color: '#0F172A', marginBottom: 16 }}>📊 Perfil tributario</h3>
+          <div style={{ background: theme.cardBg, borderRadius: 12, padding: '20px 24px', boxShadow: theme.cardShadow, border: `1px solid ${theme.cardBorder}`, gridColumn: '1 / -1' }}>
+            <h3 style={{ fontSize: 14, fontWeight: 600, color: theme.textPrimary, marginBottom: 16 }}>📊 Perfil tributario</h3>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {[
                 { key: 'contribuyenteIva', label: 'Contribuyente IVA' },
@@ -316,9 +400,9 @@ export default function ClientDetailPage() {
               ].map(({ key, label }) => (
                 <span key={key} style={{
                   padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500,
-                  background: (client as any)[key] ? '#EDE9FE' : '#F1F5F9',
-                  color: (client as any)[key] ? '#6D28D9' : '#94A3B8',
-                  border: `1px solid ${(client as any)[key] ? '#C4B5FD' : '#E2E8F0'}`,
+                  background: (client as any)[key] ? theme.accentLight : theme.tableHeaderBg,
+                  color: (client as any)[key] ? theme.accentText : theme.textMuted,
+                  border: `1px solid ${(client as any)[key] ? theme.accent + '44' : theme.cardBorder}`,
                 }}>
                   {(client as any)[key] ? '✓' : '–'} {label}
                 </span>
@@ -326,9 +410,9 @@ export default function ClientDetailPage() {
             </div>
           </div>
           {client.notas && (
-            <div style={{ background: '#fff', borderRadius: 12, padding: '20px 24px', boxShadow: '0 1px 3px rgba(0,0,0,0.07)', gridColumn: '1 / -1' }}>
-              <h3 style={{ fontSize: 14, fontWeight: 600, color: '#0F172A', marginBottom: 8 }}>📝 Notas</h3>
-              <p style={{ fontSize: 14, color: '#475569', lineHeight: 1.6 }}>{client.notas}</p>
+            <div style={{ background: theme.cardBg, borderRadius: 12, padding: '20px 24px', boxShadow: theme.cardShadow, border: `1px solid ${theme.cardBorder}`, gridColumn: '1 / -1' }}>
+              <h3 style={{ fontSize: 14, fontWeight: 600, color: theme.textPrimary, marginBottom: 8 }}>📝 Notas</h3>
+              <p style={{ fontSize: 14, color: theme.textSecondary, lineHeight: 1.6 }}>{client.notas}</p>
             </div>
           )}
         </div>
@@ -338,31 +422,31 @@ export default function ClientDetailPage() {
       {tab === 'vencimientos' && (
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-            <p style={{ fontSize: 13, color: '#64748B' }}>{vencimientos.length} vencimiento{vencimientos.length !== 1 ? 's' : ''} registrado{vencimientos.length !== 1 ? 's' : ''}</p>
+            <p style={{ fontSize: 13, color: theme.textSecondary }}>{vencimientos.length} vencimiento{vencimientos.length !== 1 ? 's' : ''} registrado{vencimientos.length !== 1 ? 's' : ''}</p>
             <button
               onClick={handleGenerarVencimientos}
               style={{
-                padding: '7px 16px', borderRadius: 8, border: '1px solid #E2E8F0',
-                background: '#fff', color: '#475569', fontSize: 13, cursor: 'pointer',
+                padding: '7px 16px', borderRadius: 8, border: `1px solid ${theme.cardBorder}`,
+                background: theme.cardBg, color: theme.textSecondary, fontSize: 13, cursor: 'pointer',
                 display: 'flex', alignItems: 'center', gap: 6,
               }}
             >
               ↻ Regenerar vencimientos
             </button>
           </div>
-          <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.07)', overflow: 'hidden' }}>
+          <div style={{ background: theme.cardBg, borderRadius: 12, boxShadow: theme.cardShadow, overflow: 'hidden', border: `1px solid ${theme.cardBorder}` }}>
             {vencimientos.length === 0 ? (
               <div style={{ padding: 48, textAlign: 'center' }}>
                 <div style={{ fontSize: 36, marginBottom: 12 }}>📅</div>
-                <div style={{ color: '#64748B', fontSize: 14 }}>No hay vencimientos generados</div>
-                <div style={{ color: '#94A3B8', fontSize: 13, marginTop: 4 }}>Hacé clic en "Regenerar vencimientos" para crearlos según el perfil tributario</div>
+                <div style={{ color: theme.textSecondary, fontSize: 14 }}>No hay vencimientos generados</div>
+                <div style={{ color: theme.textMuted, fontSize: 13, marginTop: 4 }}>Hacé clic en "Regenerar vencimientos" para crearlos según el perfil tributario</div>
               </div>
             ) : (
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
-                  <tr style={{ background: '#F8FAFC', borderBottom: '1px solid #E2E8F0' }}>
-                    {['Tipo', 'Período', 'Vencimiento', 'Estado'].map(h => (
-                      <th key={h} style={{ padding: '11px 16px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
+                  <tr style={{ background: theme.tableHeaderBg, borderBottom: `1px solid ${theme.cardBorder}` }}>
+                    {['Tipo', 'Período', 'Vencimiento', 'Estado', ''].map(h => (
+                      <th key={h} style={{ padding: '11px 16px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -372,18 +456,31 @@ export default function ClientDetailPage() {
                     .map((v, i) => {
                       const c = ESTADO_VENC_COLORS[v.estado];
                       return (
-                        <tr key={v.id} style={{ borderBottom: i < vencimientos.length - 1 ? '1px solid #F1F5F9' : 'none' }}>
-                          <td style={{ padding: '13px 16px', fontSize: 14, color: '#0F172A', fontWeight: 500 }}>
+                        <tr key={v.id} style={{ borderBottom: i < vencimientos.length - 1 ? `1px solid ${theme.tableBorder}` : 'none' }}>
+                          <td style={{ padding: '13px 16px', fontSize: 14, color: theme.textPrimary, fontWeight: 500 }}>
                             {v.tipo.replace(/_/g, ' ').toUpperCase()}
                           </td>
-                          <td style={{ padding: '13px 16px', fontSize: 13, color: '#64748B' }}>{v.periodo ?? '—'}</td>
-                          <td style={{ padding: '13px 16px', fontSize: 13, color: '#0F172A' }}>
+                          <td style={{ padding: '13px 16px', fontSize: 13, color: theme.textSecondary }}>{v.periodo ?? '—'}</td>
+                          <td style={{ padding: '13px 16px', fontSize: 13, color: theme.textPrimary }}>
                             {new Date(v.fechaVencimiento).toLocaleDateString('es-UY')}
                           </td>
                           <td style={{ padding: '13px 16px' }}>
                             <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 500, background: c.bg, color: c.color }}>
                               {v.estado.charAt(0).toUpperCase() + v.estado.slice(1)}
                             </span>
+                          </td>
+                          <td style={{ padding: '13px 16px' }}>
+                            {v.estado !== 'completado' && (
+                              <button
+                                onClick={async () => {
+                                  await calendarApi.completar(v.id);
+                                  setVencimientos(vs => vs.map(x => x.id === v.id ? { ...x, estado: 'completado' as EstadoVencimiento } : x));
+                                }}
+                                style={{ padding: '4px 10px', borderRadius: 6, border: 'none', background: '#DCFCE7', color: '#15803D', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                              >
+                                ✓ Completar
+                              </button>
+                            )}
                           </td>
                         </tr>
                       );
@@ -405,7 +502,7 @@ export default function ClientDetailPage() {
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
                 padding: '7px 16px', borderRadius: 8, border: 'none',
-                background: '#6D28D9', color: '#fff', fontSize: 13, fontWeight: 500, cursor: 'pointer',
+                background: theme.accent, color: '#fff', fontSize: 13, fontWeight: 500, cursor: 'pointer',
               }}
             >
               + Nueva credencial
@@ -413,14 +510,14 @@ export default function ClientDetailPage() {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
             {credentials.length === 0 ? (
-              <div style={{ gridColumn: '1/-1', padding: 48, textAlign: 'center', background: '#fff', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.07)' }}>
+              <div style={{ gridColumn: '1/-1', padding: 48, textAlign: 'center', background: theme.cardBg, borderRadius: 12, boxShadow: theme.cardShadow, border: `1px solid ${theme.cardBorder}` }}>
                 <div style={{ fontSize: 36, marginBottom: 12 }}>🔑</div>
-                <div style={{ color: '#64748B', fontSize: 14 }}>No hay credenciales guardadas</div>
+                <div style={{ color: theme.textSecondary, fontSize: 14 }}>No hay credenciales guardadas</div>
               </div>
             ) : credentials.map(cred => {
               const color = PLATAFORMA_COLORS[cred.plataforma] ?? '#475569';
               return (
-                <div key={cred.id} style={{ background: '#fff', borderRadius: 12, padding: '18px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.07)', borderTop: `3px solid ${color}` }}>
+                <div key={cred.id} style={{ background: theme.cardBg, borderRadius: 12, padding: '18px 20px', boxShadow: theme.cardShadow, border: `1px solid ${theme.cardBorder}`, borderTop: `3px solid ${color}` }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
                     <div>
                       <span style={{ fontSize: 13, fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
@@ -437,21 +534,21 @@ export default function ClientDetailPage() {
                     >✕</button>
                   </div>
                   {cred.usuario && (
-                    <div style={{ marginBottom: 8 }}>
-                      <div style={{ fontSize: 11, color: '#94A3B8', marginBottom: 2 }}>USUARIO</div>
-                      <div style={{ fontSize: 13, color: '#0F172A', fontWeight: 500, fontFamily: 'monospace' }}>{cred.usuario}</div>
-                    </div>
+                  <div style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, color: theme.textMuted, marginBottom: 2 }}>USUARIO</div>
+                  <div style={{ fontSize: 13, color: theme.textPrimary, fontWeight: 500, fontFamily: 'monospace' }}>{cred.usuario}</div>
+                  </div>
                   )}
                   <div style={{ marginBottom: 8 }}>
-                    <div style={{ fontSize: 11, color: '#94A3B8', marginBottom: 2 }}>CONTRASEÑA</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 13, color: '#0F172A', fontFamily: 'monospace', flex: 1 }}>
+                  <div style={{ fontSize: 11, color: theme.textMuted, marginBottom: 2 }}>CONTRASEÑA</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 13, color: theme.textPrimary, fontFamily: 'monospace', flex: 1 }}>
                         {revealed[cred.id] ?? '••••••••'}
                       </span>
                       <button
                         onClick={() => handleReveal(cred.id)}
                         disabled={revealing === cred.id}
-                        style={{ background: 'none', border: '1px solid #E2E8F0', borderRadius: 5, padding: '3px 8px', fontSize: 11, cursor: 'pointer', color: '#6D28D9' }}
+                        style={{ background: 'none', border: `1px solid ${theme.cardBorder}`, borderRadius: 5, padding: '3px 8px', fontSize: 11, cursor: 'pointer', color: theme.accentText }}
                       >
                         {revealing === cred.id ? '...' : revealed[cred.id] ? 'Ocultar' : 'Ver'}
                       </button>
@@ -459,11 +556,11 @@ export default function ClientDetailPage() {
                   </div>
                   {cred.pin && (
                     <div>
-                      <div style={{ fontSize: 11, color: '#94A3B8', marginBottom: 2 }}>PIN</div>
-                      <div style={{ fontSize: 13, color: '#0F172A', fontFamily: 'monospace' }}>{cred.pin}</div>
+                      <div style={{ fontSize: 11, color: theme.textMuted, marginBottom: 2 }}>PIN</div>
+                      <div style={{ fontSize: 13, color: theme.textPrimary, fontFamily: 'monospace' }}>{cred.pin}</div>
                     </div>
                   )}
-                  {cred.notas && <div style={{ marginTop: 10, fontSize: 12, color: '#94A3B8', borderTop: '1px solid #F1F5F9', paddingTop: 8 }}>{cred.notas}</div>}
+                  {cred.notas && <div style={{ marginTop: 10, fontSize: 12, color: theme.textMuted, borderTop: `1px solid ${theme.tableBorder}`, paddingTop: 8 }}>{cred.notas}</div>}
                 </div>
               );
             })}
@@ -473,14 +570,14 @@ export default function ClientDetailPage() {
           {showCredModal && (
             <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
               onClick={e => e.target === e.currentTarget && setShowCredModal(false)}>
-              <div style={{ background: '#fff', borderRadius: 14, padding: '28px', width: 420, boxShadow: '0 20px 40px rgba(0,0,0,0.15)' }}>
-                <h2 style={{ fontSize: 17, fontWeight: 700, color: '#0F172A', marginBottom: 20 }}>Nueva credencial</h2>
+              <div style={{ background: theme.cardBg, borderRadius: 14, padding: '28px', width: 420, boxShadow: '0 20px 40px rgba(0,0,0,0.25)', border: `1px solid ${theme.cardBorder}` }}>
+                <h2 style={{ fontSize: 17, fontWeight: 700, color: theme.textPrimary, marginBottom: 20 }}>Nueva credencial</h2>
                 <form onSubmit={handleSaveCred}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                     <div>
-                      <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 5 }}>Plataforma <span style={{ color: '#DC2626' }}>*</span></label>
+                      <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: theme.textSecondary, marginBottom: 5 }}>Plataforma <span style={{ color: '#DC2626' }}>*</span></label>
                       <select value={credForm.plataforma} onChange={e => setCredForm(f => ({ ...f, plataforma: e.target.value as PlataformaCredencial }))}
-                        style={{ width: '100%', padding: '8px 11px', borderRadius: 7, border: '1px solid #D1D5DB', fontSize: 14, background: '#fff', boxSizing: 'border-box' as const }}>
+                        style={{ width: '100%', padding: '8px 11px', borderRadius: 7, border: `1px solid ${theme.inputBorder}`, fontSize: 14, background: theme.inputBg, color: theme.textPrimary, boxSizing: 'border-box' as const }}>
                         {Object.entries(PLATAFORMA_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                       </select>
                     </div>
@@ -494,8 +591,8 @@ export default function ClientDetailPage() {
                   </div>
                   {credError && <div style={{ background: '#FEE2E2', color: '#DC2626', borderRadius: 7, padding: '8px 12px', fontSize: 13, marginTop: 12 }}>{credError}</div>}
                   <div style={{ display: 'flex', gap: 10, marginTop: 20, justifyContent: 'flex-end' }}>
-                    <button type="button" onClick={() => setShowCredModal(false)} style={{ padding: '8px 18px', borderRadius: 7, border: '1px solid #E2E8F0', background: '#fff', color: '#475569', fontSize: 14, cursor: 'pointer' }}>Cancelar</button>
-                    <button type="submit" disabled={savingCred} style={{ padding: '8px 20px', borderRadius: 7, border: 'none', background: '#6D28D9', color: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer', opacity: savingCred ? 0.7 : 1 }}>
+                    <button type="button" onClick={() => setShowCredModal(false)} style={{ padding: '8px 18px', borderRadius: 7, border: `1px solid ${theme.cardBorder}`, background: theme.cardBg, color: theme.textSecondary, fontSize: 14, cursor: 'pointer' }}>Cancelar</button>
+                    <button type="submit" disabled={savingCred} style={{ padding: '8px 20px', borderRadius: 7, border: 'none', background: theme.accent, color: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer', opacity: savingCred ? 0.7 : 1 }}>
                       {savingCred ? 'Guardando...' : 'Guardar'}
                     </button>
                   </div>
@@ -597,8 +694,8 @@ export default function ClientDetailPage() {
           {showHonModal && (
             <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
               onClick={e => e.target === e.currentTarget && setShowHonModal(false)}>
-              <div style={{ background: '#fff', borderRadius: 14, padding: '28px', width: 420, boxShadow: '0 20px 40px rgba(0,0,0,0.18)' }}>
-                <h2 style={{ fontSize: 17, fontWeight: 700, color: '#0F172A', marginBottom: 20 }}>
+              <div style={{ background: theme.cardBg, borderRadius: 14, padding: '28px', width: 420, boxShadow: '0 20px 40px rgba(0,0,0,0.25)', border: `1px solid ${theme.cardBorder}` }}>
+                <h2 style={{ fontSize: 17, fontWeight: 700, color: theme.textPrimary, marginBottom: 20 }}>
                   {honEditId ? 'Editar honorario' : 'Nuevo honorario'}
                 </h2>
                 <form onSubmit={handleSaveHon}>
@@ -607,9 +704,9 @@ export default function ClientDetailPage() {
                     <HonField label="Monto acordado ($)" value={honForm.montoAcordado} onChange={v => setHonForm(f => ({ ...f, montoAcordado: v }))} type="number" required />
                     <HonField label="Monto cobrado ($)" value={honForm.montoCobrado} onChange={v => setHonForm(f => ({ ...f, montoCobrado: v }))} type="number" />
                     <div>
-                      <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 5 }}>Forma de pago</label>
+                      <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: theme.textSecondary, marginBottom: 5 }}>Forma de pago</label>
                       <select value={honForm.formaPago} onChange={e => setHonForm(f => ({ ...f, formaPago: e.target.value as FormaPago | '' }))}
-                        style={{ width: '100%', padding: '8px 11px', borderRadius: 7, border: '1px solid #D1D5DB', fontSize: 14, background: '#fff', boxSizing: 'border-box' as const }}>
+                        style={{ width: '100%', padding: '8px 11px', borderRadius: 7, border: `1px solid ${theme.inputBorder}`, fontSize: 14, background: theme.inputBg, color: theme.textPrimary, boxSizing: 'border-box' as const }}>
                         <option value="">Sin especificar</option>
                         <option value="efectivo">Efectivo</option>
                         <option value="transferencia">Transferencia</option>
@@ -620,7 +717,7 @@ export default function ClientDetailPage() {
                   </div>
                   {honError && <div style={{ background: '#FEE2E2', color: '#DC2626', borderRadius: 7, padding: '8px 12px', fontSize: 13, marginTop: 12 }}>{honError}</div>}
                   <div style={{ display: 'flex', gap: 10, marginTop: 20, justifyContent: 'flex-end' }}>
-                    <button type="button" onClick={() => setShowHonModal(false)} style={{ padding: '8px 18px', borderRadius: 7, border: '1px solid #E2E8F0', background: '#fff', color: '#475569', fontSize: 14, cursor: 'pointer' }}>Cancelar</button>
+                    <button type="button" onClick={() => setShowHonModal(false)} style={{ padding: '8px 18px', borderRadius: 7, border: `1px solid ${theme.cardBorder}`, background: theme.cardBg, color: theme.textSecondary, fontSize: 14, cursor: 'pointer' }}>Cancelar</button>
                     <button type="submit" disabled={savingHon} style={{ padding: '8px 20px', borderRadius: 7, border: 'none', background: theme.accent, color: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer', opacity: savingHon ? 0.7 : 1 }}>
                       {savingHon ? 'Guardando...' : honEditId ? 'Guardar cambios' : 'Crear honorario'}
                     </button>
@@ -634,9 +731,9 @@ export default function ClientDetailPage() {
           {showPagoModal && (
             <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
               onClick={e => e.target === e.currentTarget && setShowPagoModal(null)}>
-              <div style={{ background: '#fff', borderRadius: 14, padding: '28px', width: 400, boxShadow: '0 20px 40px rgba(0,0,0,0.18)' }}>
-                <h2 style={{ fontSize: 17, fontWeight: 700, color: '#0F172A', marginBottom: 4 }}>Registrar pago</h2>
-                <p style={{ fontSize: 13, color: '#64748B', marginBottom: 20 }}>
+              <div style={{ background: theme.cardBg, borderRadius: 14, padding: '28px', width: 400, boxShadow: '0 20px 40px rgba(0,0,0,0.25)', border: `1px solid ${theme.cardBorder}` }}>
+                <h2 style={{ fontSize: 17, fontWeight: 700, color: theme.textPrimary, marginBottom: 4 }}>Registrar pago</h2>
+                <p style={{ fontSize: 13, color: theme.textSecondary, marginBottom: 20 }}>
                   Honorario <strong>{showPagoModal.periodo}</strong> — acordado: <strong>${Number(showPagoModal.montoAcordado).toLocaleString('es-UY')}</strong>
                 </p>
                 <form onSubmit={handleSavePago}>
@@ -644,9 +741,9 @@ export default function ClientDetailPage() {
                     <HonField label="Monto cobrado ($)" value={pagoForm.montoCobrado} onChange={v => setPagoForm(f => ({ ...f, montoCobrado: v }))} type="number" required />
                     <HonField label="Fecha de cobro" value={pagoForm.fechaCobro} onChange={v => setPagoForm(f => ({ ...f, fechaCobro: v }))} type="date" required />
                     <div>
-                      <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 5 }}>Forma de pago <span style={{ color: '#DC2626' }}>*</span></label>
+                      <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: theme.textSecondary, marginBottom: 5 }}>Forma de pago <span style={{ color: '#DC2626' }}>*</span></label>
                       <select value={pagoForm.formaPago} onChange={e => setPagoForm(f => ({ ...f, formaPago: e.target.value as FormaPago }))}
-                        style={{ width: '100%', padding: '8px 11px', borderRadius: 7, border: '1px solid #D1D5DB', fontSize: 14, background: '#fff', boxSizing: 'border-box' as const }}>
+                        style={{ width: '100%', padding: '8px 11px', borderRadius: 7, border: `1px solid ${theme.inputBorder}`, fontSize: 14, background: theme.inputBg, color: theme.textPrimary, boxSizing: 'border-box' as const }}>
                         <option value="transferencia">Transferencia</option>
                         <option value="efectivo">Efectivo</option>
                         <option value="otro">Otro</option>
@@ -656,9 +753,193 @@ export default function ClientDetailPage() {
                   </div>
                   {honError && <div style={{ background: '#FEE2E2', color: '#DC2626', borderRadius: 7, padding: '8px 12px', fontSize: 13, marginTop: 12 }}>{honError}</div>}
                   <div style={{ display: 'flex', gap: 10, marginTop: 20, justifyContent: 'flex-end' }}>
-                    <button type="button" onClick={() => setShowPagoModal(null)} style={{ padding: '8px 18px', borderRadius: 7, border: '1px solid #E2E8F0', background: '#fff', color: '#475569', fontSize: 14, cursor: 'pointer' }}>Cancelar</button>
+                    <button type="button" onClick={() => setShowPagoModal(null)} style={{ padding: '8px 18px', borderRadius: 7, border: `1px solid ${theme.cardBorder}`, background: theme.cardBg, color: theme.textSecondary, fontSize: 14, cursor: 'pointer' }}>Cancelar</button>
                     <button type="submit" disabled={savingHon} style={{ padding: '8px 20px', borderRadius: 7, border: 'none', background: '#15803D', color: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer', opacity: savingHon ? 0.7 : 1 }}>
                       {savingHon ? 'Guardando...' : '💳 Confirmar pago'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── TAB: MOVIMIENTOS ── */}
+      {tab === 'movimientos' && (
+        <div>
+          {/* Resumen del mes actual */}
+          {movResumen && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 12, marginBottom: 20 }}>
+              {[
+                { label: 'Ventas', value: movResumen.totalVentas, color: '#15803D' },
+                { label: 'Compras', value: movResumen.totalCompras, color: '#D97706' },
+                { label: 'Gastos', value: movResumen.totalGastos, color: '#DC2626' },
+                { label: 'Débito IVA', value: movResumen.debitoIva, color: theme.accentText },
+                { label: 'Crédito IVA', value: movResumen.creditoIva, color: theme.accentText },
+                { label: 'Saldo IVA', value: movResumen.saldoIva, color: movResumen.saldoIva > 0 ? '#DC2626' : '#15803D' },
+              ].map(({ label, value, color }) => (
+                <div key={label} style={{ background: theme.cardBg, borderRadius: 10, padding: '14px 16px', boxShadow: theme.cardShadow, border: `1px solid ${theme.cardBorder}`, borderTop: `3px solid ${color}` }}>
+                  <div style={{ fontSize: 11, color: theme.textMuted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>{label}</div>
+                  <div style={{ fontSize: 17, fontWeight: 700, color }}>${Number(value).toLocaleString('es-UY', { maximumFractionDigits: 0 })}</div>
+                  <div style={{ fontSize: 10, color: theme.textMuted, marginTop: 2 }}>{movResumen.periodo} • neto</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Toolbar */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, gap: 10, flexWrap: 'wrap' as const }}>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {(['', 'venta', 'compra', 'gasto'] as const).map(t => (
+                <button key={t} onClick={() => setMovFiltroTipo(t as TipoMovimiento | '')}
+                  style={{
+                    padding: '5px 14px', borderRadius: 20, border: `1px solid ${movFiltroTipo === t ? theme.accent : theme.cardBorder}`,
+                    background: movFiltroTipo === t ? theme.accentLight : theme.cardBg,
+                    color: movFiltroTipo === t ? theme.accentText : theme.textSecondary,
+                    fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                  }}>
+                  {t === '' ? 'Todos' : t.charAt(0).toUpperCase() + t.slice(1) + 's'}
+                </button>
+              ))}
+            </div>
+            <button onClick={openNewMov} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 16px', borderRadius: 8, border: 'none', background: theme.accent, color: '#fff', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
+              + Nuevo movimiento
+            </button>
+          </div>
+
+          {/* Tabla */}
+          <div style={{ background: theme.cardBg, borderRadius: 12, boxShadow: theme.cardShadow, overflow: 'hidden', border: `1px solid ${theme.cardBorder}` }}>
+            {(() => {
+              const filtered = movFiltroTipo ? movimientos.filter(m => m.tipo === movFiltroTipo) : movimientos;
+              const TIPO_COLORS: Record<TipoMovimiento, { bg: string; color: string; label: string }> = {
+                venta:  { bg: '#DCFCE7', color: '#15803D', label: '↑ Venta' },
+                compra: { bg: '#FEF3C7', color: '#D97706', label: '↓ Compra' },
+                gasto:  { bg: '#FEE2E2', color: '#DC2626', label: '↓ Gasto' },
+              };
+              if (filtered.length === 0) return (
+                <div style={{ padding: 48, textAlign: 'center' }}>
+                  <div style={{ fontSize: 36, marginBottom: 12 }}>📊</div>
+                  <div style={{ color: theme.textSecondary, fontSize: 14 }}>No hay movimientos registrados</div>
+                  <div style={{ color: theme.textMuted, fontSize: 13, marginTop: 4 }}>Registrá ventas, compras y gastos del cliente</div>
+                </div>
+              );
+              return (
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: theme.tableHeaderBg, borderBottom: `1px solid ${theme.cardBorder}` }}>
+                      {['Tipo', 'Fecha', 'Descripción', 'Comprobante', 'Monto', 'IVA', 'Acciones'].map(h => (
+                        <th key={h} style={{ padding: '11px 16px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' as const }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filtered.map((m, i) => {
+                      const tc = TIPO_COLORS[m.tipo];
+                      const tasa = m.tasaIva ?? 22;
+                      const montoNum = Number(m.monto);
+                      const ivaMonto = m.tipo !== 'gasto'
+                        ? (m.ivaIncluido ? montoNum * (tasa / (100 + tasa)) : montoNum * (tasa / 100))
+                        : 0;
+                      return (
+                        <tr key={m.id} style={{ borderBottom: i < filtered.length - 1 ? `1px solid ${theme.tableBorder}` : 'none' }}>
+                          <td style={{ padding: '12px 16px' }}>
+                            <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 600, background: tc.bg, color: tc.color }}>{tc.label}</span>
+                          </td>
+                          <td style={{ padding: '12px 16px', fontSize: 13, color: theme.textSecondary, whiteSpace: 'nowrap' as const }}>
+                            {new Date(m.fecha).toLocaleDateString('es-UY')}
+                          </td>
+                          <td style={{ padding: '12px 16px', fontSize: 13, color: theme.textPrimary, maxWidth: 200 }}>
+                            {m.descripcion || <span style={{ color: theme.textMuted }}>—</span>}
+                          </td>
+                          <td style={{ padding: '12px 16px', fontSize: 12, color: theme.textMuted, fontFamily: 'monospace' }}>
+                            {m.nroComprobante || '—'}
+                          </td>
+                          <td style={{ padding: '12px 16px', fontSize: 14, fontWeight: 600, color: theme.textPrimary, whiteSpace: 'nowrap' as const }}>
+                            ${montoNum.toLocaleString('es-UY')}
+                            {m.ivaIncluido && <span style={{ fontSize: 10, color: theme.textMuted, fontWeight: 400, marginLeft: 4 }}>c/IVA</span>}
+                          </td>
+                          <td style={{ padding: '12px 16px', fontSize: 12, color: theme.textMuted, whiteSpace: 'nowrap' as const }}>
+                            {m.tipo !== 'gasto' && ivaMonto > 0
+                              ? <span>${ivaMonto.toLocaleString('es-UY', { maximumFractionDigits: 0 })} ({tasa}%)</span>
+                              : '—'}
+                          </td>
+                          <td style={{ padding: '12px 16px' }}>
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              <button onClick={() => openEditMov(m)}
+                                style={{ padding: '4px 8px', borderRadius: 6, border: `1px solid ${theme.cardBorder}`, background: theme.cardBg, cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                                <svg width="13" height="13" fill="none" stroke={theme.textSecondary} strokeWidth="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                              </button>
+                              <button onClick={() => handleDeleteMov(m.id)}
+                                style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #FEE2E2', background: '#FFF5F5', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                                <svg width="13" height="13" fill="none" stroke="#DC2626" strokeWidth="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              );
+            })()}
+          </div>
+
+          {/* Modal nuevo/editar movimiento */}
+          {showMovModal && (
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
+              onClick={e => e.target === e.currentTarget && setShowMovModal(false)}>
+              <div style={{ background: theme.cardBg, borderRadius: 14, padding: '28px', width: 460, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 40px rgba(0,0,0,0.25)', border: `1px solid ${theme.cardBorder}` }}>
+                <h2 style={{ fontSize: 17, fontWeight: 700, color: theme.textPrimary, marginBottom: 20 }}>
+                  {movEditId ? 'Editar movimiento' : 'Nuevo movimiento'}
+                </h2>
+                <form onSubmit={handleSaveMov}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: theme.textSecondary, marginBottom: 5 }}>Tipo <span style={{ color: '#DC2626' }}>*</span></label>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        {(['venta', 'compra', 'gasto'] as TipoMovimiento[]).map(t => (
+                          <button key={t} type="button" onClick={() => setMovForm(f => ({ ...f, tipo: t }))}
+                            style={{
+                              flex: 1, padding: '8px', borderRadius: 7,
+                              border: `2px solid ${movForm.tipo === t ? theme.accent : theme.inputBorder}`,
+                              background: movForm.tipo === t ? theme.accentLight : theme.inputBg,
+                              color: movForm.tipo === t ? theme.accentText : theme.textSecondary,
+                              fontWeight: 600, fontSize: 13, cursor: 'pointer',
+                            }}>
+                            {t.charAt(0).toUpperCase() + t.slice(1)}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <HonField label="Fecha" value={movForm.fecha} onChange={v => setMovForm(f => ({ ...f, fecha: v }))} type="date" required />
+                    <HonField label="Descripción" value={movForm.descripcion} onChange={v => setMovForm(f => ({ ...f, descripcion: v }))} placeholder="Ej: Venta factura 123" />
+                    <HonField label="Monto ($)" value={movForm.monto} onChange={v => setMovForm(f => ({ ...f, monto: v }))} type="number" required />
+                    {movForm.tipo !== 'gasto' && (
+                      <>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: theme.textSecondary, cursor: 'pointer' }}>
+                          <input type="checkbox" checked={movForm.ivaIncluido} onChange={e => setMovForm(f => ({ ...f, ivaIncluido: e.target.checked }))} style={{ width: 15, height: 15 }} />
+                          IVA incluido en el monto
+                        </label>
+                        <div>
+                          <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: theme.textSecondary, marginBottom: 5 }}>Tasa IVA (%)</label>
+                          <select value={movForm.tasaIva} onChange={e => setMovForm(f => ({ ...f, tasaIva: e.target.value }))}
+                            style={{ width: '100%', padding: '8px 11px', borderRadius: 7, border: `1px solid ${theme.inputBorder}`, fontSize: 14, background: theme.inputBg, color: theme.textPrimary }}>
+                            <option value="22">22% (General)</option>
+                            <option value="10">10% (Mínima)</option>
+                            <option value="0">0% (Exento)</option>
+                          </select>
+                        </div>
+                      </>
+                    )}
+                    <HonField label="Nº Comprobante" value={movForm.nroComprobante} onChange={v => setMovForm(f => ({ ...f, nroComprobante: v }))} placeholder="Ej: A-0001234" />
+                    <HonField label="Notas" value={movForm.notas} onChange={v => setMovForm(f => ({ ...f, notas: v }))} />
+                  </div>
+                  {movError && <div style={{ background: '#FEE2E2', color: '#DC2626', borderRadius: 7, padding: '8px 12px', fontSize: 13, marginTop: 12 }}>{movError}</div>}
+                  <div style={{ display: 'flex', gap: 10, marginTop: 20, justifyContent: 'flex-end' }}>
+                    <button type="button" onClick={() => setShowMovModal(false)} style={{ padding: '8px 18px', borderRadius: 7, border: `1px solid ${theme.cardBorder}`, background: theme.cardBg, color: theme.textSecondary, fontSize: 14, cursor: 'pointer' }}>Cancelar</button>
+                    <button type="submit" disabled={savingMov} style={{ padding: '8px 20px', borderRadius: 7, border: 'none', background: theme.accent, color: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer', opacity: savingMov ? 0.7 : 1 }}>
+                      {savingMov ? 'Guardando...' : movEditId ? 'Guardar cambios' : 'Registrar'}
                     </button>
                   </div>
                 </form>
@@ -672,32 +953,34 @@ export default function ClientDetailPage() {
 }
 
 // ── Small field component ──────────────────────────────────────────────────────
-function CredField({ label, value, onChange, type = 'text' }: { label: string; value: string; onChange: (v: string) => void; type?: string }) {
+function CredField({ label, value, onChange, type = 'text', theme }: { label: string; value: string; onChange: (v: string) => void; type?: string; theme?: any }) {
+  const t = theme ?? { textSecondary: '#374151', inputBorder: '#D1D5DB', inputBg: '#fff', textPrimary: '#0F172A', inputBorderFocus: '#6D28D9' };
   return (
     <div>
-      <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 5 }}>{label}</label>
+      <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: t.textSecondary, marginBottom: 5 }}>{label}</label>
       <input type={type} value={value} onChange={e => onChange(e.target.value)}
-        style={{ width: '100%', padding: '8px 11px', borderRadius: 7, border: '1px solid #D1D5DB', fontSize: 14, color: '#0F172A', outline: 'none', boxSizing: 'border-box' as const }}
-        onFocus={e => (e.target.style.borderColor = '#6D28D9')}
-        onBlur={e => (e.target.style.borderColor = '#D1D5DB')} />
+        style={{ width: '100%', padding: '8px 11px', borderRadius: 7, border: `1px solid ${t.inputBorder}`, fontSize: 14, color: t.textPrimary, background: t.inputBg, outline: 'none', boxSizing: 'border-box' as const }}
+        onFocus={e => (e.target.style.borderColor = t.inputBorderFocus)}
+        onBlur={e => (e.target.style.borderColor = t.inputBorder)} />
     </div>
   );
 }
 
-function HonField({ label, value, onChange, type = 'text', required, placeholder }: {
+function HonField({ label, value, onChange, type = 'text', required, placeholder, theme }: {
   label: string; value: string; onChange: (v: string) => void;
-  type?: string; required?: boolean; placeholder?: string;
+  type?: string; required?: boolean; placeholder?: string; theme?: any;
 }) {
+  const t = theme ?? { textSecondary: '#374151', inputBorder: '#D1D5DB', inputBg: '#fff', textPrimary: '#0F172A', inputBorderFocus: '#2563eb' };
   return (
     <div>
-      <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 5 }}>
+      <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: t.textSecondary, marginBottom: 5 }}>
         {label}{required && <span style={{ color: '#DC2626' }}> *</span>}
       </label>
       <input type={type} value={value} onChange={e => onChange(e.target.value)}
         required={required} placeholder={placeholder}
-        style={{ width: '100%', padding: '8px 11px', borderRadius: 7, border: '1px solid #D1D5DB', fontSize: 14, color: '#0F172A', outline: 'none', boxSizing: 'border-box' as const }}
-        onFocus={e => (e.target.style.borderColor = '#2563eb')}
-        onBlur={e => (e.target.style.borderColor = '#D1D5DB')} />
+        style={{ width: '100%', padding: '8px 11px', borderRadius: 7, border: `1px solid ${t.inputBorder}`, fontSize: 14, color: t.textPrimary, background: t.inputBg, outline: 'none', boxSizing: 'border-box' as const }}
+        onFocus={e => (e.target.style.borderColor = t.inputBorderFocus)}
+        onBlur={e => (e.target.style.borderColor = t.inputBorder)} />
     </div>
   );
 }

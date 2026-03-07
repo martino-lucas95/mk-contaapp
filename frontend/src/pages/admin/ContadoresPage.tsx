@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import api from '../../services/api';
+import { useThemeStore } from '../../store/theme.store';
 
 interface Contador {
   id: string;
@@ -30,6 +31,7 @@ const Badge = ({ activo }: { activo: boolean }) => (
 const EMPTY_FORM = { nombre: '', apellido: '', email: '', password: '' };
 
 export default function ContadoresPage() {
+  const { theme } = useThemeStore();
   const [contadores, setContadores] = useState<Contador[]>([]);
   const [loading, setLoading]       = useState(true);
   const [showModal, setShowModal]   = useState(false);
@@ -80,19 +82,19 @@ export default function ContadoresPage() {
   };
 
   return (
-    <div style={{ padding: '28px 32px' }}>
+    <div style={{ padding: '28px 32px', background: theme.mainBg, minHeight: '100%', color: theme.textPrimary }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 700, color: '#0F172A', marginBottom: 4 }}>Contadores</h1>
-          <p style={{ color: '#64748B', fontSize: 14 }}>Gestión de usuarios contadores del sistema</p>
+          <h1 style={{ fontSize: 22, fontWeight: 700, color: theme.textPrimary, marginBottom: 4 }}>Contadores</h1>
+          <p style={{ color: theme.textSecondary, fontSize: 14 }}>Gestión de usuarios contadores del sistema</p>
         </div>
         <button
           onClick={() => { setShowModal(true); setError(''); setForm(EMPTY_FORM); }}
           style={{
             display: 'flex', alignItems: 'center', gap: 8,
             padding: '9px 18px', borderRadius: 8,
-            background: '#6D28D9', color: '#fff', border: 'none',
+            background: theme.accent, color: '#fff', border: 'none',
             fontSize: 14, fontWeight: 500, cursor: 'pointer',
           }}
         >
@@ -104,23 +106,23 @@ export default function ContadoresPage() {
       </div>
 
       {/* Tabla */}
-      <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.07)', overflow: 'hidden' }}>
+      <div style={{ background: theme.cardBg, borderRadius: 12, boxShadow: theme.cardShadow, border: `1px solid ${theme.cardBorder}`, overflow: 'hidden' }}>
         {loading ? (
-          <div style={{ padding: 40, textAlign: 'center', color: '#94A3B8', fontSize: 14 }}>Cargando...</div>
+          <div style={{ padding: 40, textAlign: 'center', color: theme.textMuted, fontSize: 14 }}>Cargando...</div>
         ) : contadores.length === 0 ? (
           <div style={{ padding: 48, textAlign: 'center' }}>
             <div style={{ fontSize: 36, marginBottom: 12 }}>👤</div>
-            <div style={{ color: '#64748B', fontSize: 14 }}>No hay contadores registrados</div>
-            <div style={{ color: '#94A3B8', fontSize: 13, marginTop: 4 }}>Creá el primero con el botón de arriba</div>
+            <div style={{ color: theme.textSecondary, fontSize: 14 }}>No hay contadores registrados</div>
+            <div style={{ color: theme.textMuted, fontSize: 13, marginTop: 4 }}>Creá el primero con el botón de arriba</div>
           </div>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ background: '#F8FAFC', borderBottom: '1px solid #E2E8F0' }}>
+              <tr style={{ background: theme.tableHeaderBg, borderBottom: `1px solid ${theme.cardBorder}` }}>
                 {['Nombre', 'Email', 'Estado', 'Creado', 'Acciones'].map(h => (
                   <th key={h} style={{
                     padding: '12px 16px', textAlign: 'left',
-                    fontSize: 12, fontWeight: 600, color: '#64748B',
+                    fontSize: 12, fontWeight: 600, color: theme.textMuted,
                     textTransform: 'uppercase', letterSpacing: '0.05em',
                   }}>{h}</th>
                 ))}
@@ -129,29 +131,32 @@ export default function ContadoresPage() {
             <tbody>
               {contadores.map((c, i) => (
                 <tr key={c.id} style={{
-                  borderBottom: i < contadores.length - 1 ? '1px solid #F1F5F9' : 'none',
+                  borderBottom: i < contadores.length - 1 ? `1px solid ${theme.tableBorder}` : 'none',
                   transition: 'background 0.1s',
-                }}>
+                }}
+                  onMouseEnter={e => (e.currentTarget.style.background = theme.tableRowHover)}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                >
                   <td style={{ padding: '14px 16px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                       <div style={{
                         width: 34, height: 34, borderRadius: '50%',
-                        background: '#EDE9FE', color: '#6D28D9',
+                        background: theme.accentLight, color: theme.accentText,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         fontSize: 12, fontWeight: 700, flexShrink: 0,
                       }}>
                         {c.nombre[0]}{c.apellido[0]}
                       </div>
                       <div>
-                        <div style={{ fontSize: 14, fontWeight: 500, color: '#0F172A' }}>
+                        <div style={{ fontSize: 14, fontWeight: 500, color: theme.textPrimary }}>
                           {c.nombre} {c.apellido}
                         </div>
                       </div>
                     </div>
                   </td>
-                  <td style={{ padding: '14px 16px', fontSize: 14, color: '#475569' }}>{c.email}</td>
+                  <td style={{ padding: '14px 16px', fontSize: 14, color: theme.textSecondary }}>{c.email}</td>
                   <td style={{ padding: '14px 16px' }}><Badge activo={c.activo} /></td>
-                  <td style={{ padding: '14px 16px', fontSize: 13, color: '#94A3B8' }}>
+                  <td style={{ padding: '14px 16px', fontSize: 13, color: theme.textMuted }}>
                     {new Date(c.createdAt).toLocaleDateString('es-UY')}
                   </td>
                   <td style={{ padding: '14px 16px' }}>
@@ -178,24 +183,24 @@ export default function ContadoresPage() {
       {/* Modal nuevo contador */}
       {showModal && (
         <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
         }} onClick={(e) => e.target === e.currentTarget && setShowModal(false)}>
           <div style={{
-            background: '#fff', borderRadius: 14, padding: '28px 28px 24px',
-            width: 420, boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
+            background: theme.cardBg, borderRadius: 14, padding: '28px 28px 24px',
+            width: 420, boxShadow: '0 20px 40px rgba(0,0,0,0.25)', border: `1px solid ${theme.cardBorder}`,
           }}>
-            <h2 style={{ fontSize: 18, fontWeight: 700, color: '#0F172A', marginBottom: 20 }}>
+            <h2 style={{ fontSize: 18, fontWeight: 700, color: theme.textPrimary, marginBottom: 20 }}>
               Nuevo contador
             </h2>
             <form onSubmit={handleCreate}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-                <Field label="Nombre" value={form.nombre} onChange={v => setForm(f => ({ ...f, nombre: v }))} required />
-                <Field label="Apellido" value={form.apellido} onChange={v => setForm(f => ({ ...f, apellido: v }))} required />
+                <Field label="Nombre" value={form.nombre} onChange={v => setForm(f => ({ ...f, nombre: v }))} required theme={theme} />
+                <Field label="Apellido" value={form.apellido} onChange={v => setForm(f => ({ ...f, apellido: v }))} required theme={theme} />
               </div>
-              <Field label="Email" type="email" value={form.email} onChange={v => setForm(f => ({ ...f, email: v }))} required />
+              <Field label="Email" type="email" value={form.email} onChange={v => setForm(f => ({ ...f, email: v }))} required theme={theme} />
               <div style={{ marginTop: 12 }}>
-                <Field label="Contraseña" type="password" value={form.password} onChange={v => setForm(f => ({ ...f, password: v }))} required />
+                <Field label="Contraseña" type="password" value={form.password} onChange={v => setForm(f => ({ ...f, password: v }))} required theme={theme} />
               </div>
               {error && (
                 <div style={{ background: '#FEE2E2', color: '#DC2626', borderRadius: 7, padding: '8px 12px', fontSize: 13, marginTop: 12 }}>
@@ -204,12 +209,12 @@ export default function ContadoresPage() {
               )}
               <div style={{ display: 'flex', gap: 10, marginTop: 20, justifyContent: 'flex-end' }}>
                 <button type="button" onClick={() => setShowModal(false)} style={{
-                  padding: '8px 18px', borderRadius: 7, border: '1px solid #E2E8F0',
-                  background: '#fff', color: '#475569', fontSize: 14, cursor: 'pointer',
+                  padding: '8px 18px', borderRadius: 7, border: `1px solid ${theme.cardBorder}`,
+                  background: theme.cardBg, color: theme.textSecondary, fontSize: 14, cursor: 'pointer',
                 }}>Cancelar</button>
                 <button type="submit" disabled={saving} style={{
                   padding: '8px 20px', borderRadius: 7, border: 'none',
-                  background: '#6D28D9', color: '#fff', fontSize: 14,
+                  background: theme.accent, color: '#fff', fontSize: 14,
                   fontWeight: 500, cursor: saving ? 'not-allowed' : 'pointer',
                   opacity: saving ? 0.7 : 1,
                 }}>
@@ -224,21 +229,21 @@ export default function ContadoresPage() {
       {/* Modal confirmar desactivar */}
       {confirmDelete && (
         <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
         }}>
           <div style={{
-            background: '#fff', borderRadius: 14, padding: '28px',
-            width: 380, boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
+            background: theme.cardBg, borderRadius: 14, padding: '28px',
+            width: 380, boxShadow: '0 20px 40px rgba(0,0,0,0.25)', border: `1px solid ${theme.cardBorder}`,
           }}>
-            <h2 style={{ fontSize: 17, fontWeight: 700, color: '#0F172A', marginBottom: 10 }}>¿Desactivar contador?</h2>
-            <p style={{ color: '#64748B', fontSize: 14, marginBottom: 20 }}>
+            <h2 style={{ fontSize: 17, fontWeight: 700, color: theme.textPrimary, marginBottom: 10 }}>¿Desactivar contador?</h2>
+            <p style={{ color: theme.textSecondary, fontSize: 14, marginBottom: 20 }}>
               <strong>{confirmDelete.nombre} {confirmDelete.apellido}</strong> no podrá iniciar sesión hasta que lo vuelvas a activar.
             </p>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
               <button onClick={() => setConfirmDelete(null)} style={{
-                padding: '8px 18px', borderRadius: 7, border: '1px solid #E2E8F0',
-                background: '#fff', color: '#475569', fontSize: 14, cursor: 'pointer',
+                padding: '8px 18px', borderRadius: 7, border: `1px solid ${theme.cardBorder}`,
+                background: theme.cardBg, color: theme.textSecondary, fontSize: 14, cursor: 'pointer',
               }}>Cancelar</button>
               <button onClick={handleDeactivate} style={{
                 padding: '8px 18px', borderRadius: 7, border: 'none',
@@ -254,13 +259,13 @@ export default function ContadoresPage() {
 }
 
 // ── Campo de formulario reutilizable ─────────────────────────────────────────
-function Field({ label, value, onChange, type = 'text', required }: {
+function Field({ label, value, onChange, type = 'text', required, theme }: {
   label: string; value: string; onChange: (v: string) => void;
-  type?: string; required?: boolean;
+  type?: string; required?: boolean; theme: any;
 }) {
   return (
     <div>
-      <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 5 }}>
+      <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: theme.textSecondary, marginBottom: 5 }}>
         {label}{required && <span style={{ color: '#DC2626' }}> *</span>}
       </label>
       <input
@@ -268,11 +273,12 @@ function Field({ label, value, onChange, type = 'text', required }: {
         required={required}
         style={{
           width: '100%', padding: '8px 11px', borderRadius: 7,
-          border: '1px solid #D1D5DB', fontSize: 14, color: '#0F172A',
-          outline: 'none', boxSizing: 'border-box',
+          border: `1px solid ${theme.inputBorder}`, fontSize: 14, color: theme.textPrimary,
+          outline: 'none', boxSizing: 'border-box' as const,
+          background: theme.inputBg,
         }}
-        onFocus={e => (e.target.style.borderColor = '#6D28D9')}
-        onBlur={e => (e.target.style.borderColor = '#D1D5DB')}
+        onFocus={e => (e.target.style.borderColor = theme.inputBorderFocus)}
+        onBlur={e => (e.target.style.borderColor = theme.inputBorder)}
       />
     </div>
   );
