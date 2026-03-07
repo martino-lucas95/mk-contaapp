@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { clientsApi, calendarApi, credentialsApi, feesApi, movementsApi } from '../services/api';
+import { startRegistration, startAuthentication } from '@simplewebauthn/browser';
+import { clientsApi, calendarApi, credentialsApi, feesApi, movementsApi, authApi } from '../services/api';
+import { useAuthStore } from '../store/auth.store';
 import { useThemeStore } from '../store/theme.store';
-import { Client, Vencimiento, Credential, Honorario, Movimiento, TipoMovimiento, EstadoVencimiento, PlataformaCredencial, FormaPago } from '../types';
+import { Client, Vencimiento, Credential, Honorario, Movimiento, TipoMovimiento, EstadoVencimiento, PlataformaCredencial, FormaPago, FeeContract, FeeFrecuencia } from '../types';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const ESTADO_VENC_COLORS: Record<EstadoVencimiento, { bg: string; color: string }> = {
@@ -102,6 +104,14 @@ export default function ClientDetailPage() {
   const [savingHon, setSavingHon] = useState(false);
   const [honError, setHonError] = useState('');
 
+  // ── Contratos state ──
+  const [contratos, setContratos] = useState<FeeContract[]>([]);
+  const [showContractModal, setShowContractModal] = useState(false);
+  const [contractEditId, setContractEditId] = useState<string | null>(null);
+  const [contractForm, setContractForm] = useState({ frecuencia: 'mensual' as FeeFrecuencia, monto: '', fechaInicio: '', fechaFin: '', notas: '' });
+  const [savingContract, setSavingContract] = useState(false);
+  const [contractError, setContractError] = useState('');
+
   // movimientos state
   const [showMovModal, setShowMovModal] = useState(false);
   const [movEditId, setMovEditId] = useState<string | null>(null);
@@ -135,12 +145,14 @@ export default function ClientDetailPage() {
       calendarApi.getByClient(id),
       credentialsApi.getByClient(id),
       feesApi.getByClient(id),
+      feesApi.getContracts(id),
       movementsApi.getByClient(id),
-    ]).then(([c, v, cr, h, m]) => {
+    ]).then(([c, v, cr, h, contracts, m]) => {
       setClient(c.data);
       setVencimientos(v.data);
       setCredentials(cr.data);
       setHonorarios(h.data);
+      setContratos(contracts.data);
       setMovimientos(m.data);
     }).catch(() => navigate('/clients'))
       .finally(() => setLoading(false));
@@ -189,6 +201,39 @@ export default function ClientDetailPage() {
       }
     } catch (err: any) {
       setAuthError('Contraseña incorrecta');
+    }
+  };
+
+  const handleWebAuthnRegister = async () => {
+    try {
+      setAuthError('');
+      const opts = await authApi.webauthnRegisterOptions();
+      const attResp = await startRegistration(opts.data);
+      await authApi.webauthnRegisterVerify(attResp);
+      alert('Dispositivo registrado correctamente con Huella/FaceID');
+    } catch (error: any) {
+      if (error.name !== 'NotAllowedError') {
+        setAuthError('Error al registrar dispositivo: ' + error.message);
+      }
+    }
+  };
+
+  const handleWebAuthnLogin = async () => {
+    try {
+      setAuthError('');
+      const opts = await authApi.webauthnLoginOptions();
+      const asseResp = await startAuthentication(opts.data);
+      const { data } = await authApi.webauthnLoginVerify(asseResp);
+      setCredentialsToken(data.token);
+      setShowAuthModal(false);
+      if (pendingRevealId) {
+        await performReveal(pendingRevealId, data.token);
+        setPendingRevealId(null);
+      }
+    } catch (error: any) {
+      if (error.name !== 'NotAllowedError') {
+        setAuthError('Error en autenticación biométrica: ' + error.message);
+      }
     }
   };
 
@@ -300,6 +345,63 @@ export default function ClientDetailPage() {
     if (!confirm('¿Eliminar este honorario?') || !id) return;
     await feesApi.delete(honId);
     setHonorarios(hs => hs.filter(h => h.id !== honId));
+  };
+
+  // ── Contratos handlers ──
+  const openNewContract = () => {
+    const now = new Date();
+    setContractForm({ frecuencia: 'mensual', monto: '', fechaInicio: now.toISOString().slice(0, 10), fechaFin: '', notas: '' });
+    setContractEditId(null);
+    setContractError('');
+    setShowContractModal(true);
+  };
+
+  const openEditContract = (c: FeeContract) => {
+    setContractForm({
+      frecuencia: c.frecuencia,
+      monto: String(c.monto),
+      fechaInicio: c.fechaInicio.slice(0, 10),
+      fechaFin: c.fechaFin ? c.fechaFin.slice(0, 10) : '',
+      notas: c.notas ?? '',
+    });
+    setContractEditId(c.id);
+    setContractError('');
+    setShowContractModal(true);
+  };
+
+  const handleSaveContract = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!id) return;
+    setSavingContract(true); setContractError('');
+    try {
+      const payload = {
+        frecuencia: contractForm.frecuencia,
+        monto: parseFloat(contractForm.monto),
+        fechaInicio: contractForm.fechaInicio,
+        fechaFin: contractForm.fechaFin || undefined,
+        notas: contractForm.notas || undefined,
+      };
+      if (contractEditId) {
+        await feesApi.updateContract(contractEditId, payload);
+      } else {
+        await feesApi.createContract(id, payload);
+      }
+      const [contractsData, feesData] = await Promise.all([
+        feesApi.getContracts(id),
+        feesApi.getByClient(id) // update honorarios list due to auto-generation
+      ]);
+      setContratos(contractsData.data);
+      setHonorarios(feesData.data);
+      setShowContractModal(false);
+    } catch (err: any) {
+      setContractError(err?.response?.data?.message || 'Error al guardar contrato');
+    } finally { setSavingContract(false); }
+  };
+
+  const handleDeleteContract = async (contractId: string) => {
+    if (!confirm('¿Eliminar/Desactivar este contrato recurrente?') || !id) return;
+    await feesApi.deleteContract(contractId);
+    setContratos(cs => cs.filter(c => c.id !== contractId));
   };
 
   // ── Movimientos handlers ──
@@ -704,12 +806,20 @@ export default function ClientDetailPage() {
                   </div>
                   <div>
                     <h2 style={{ fontSize: 18, fontWeight: 700, color: theme.textPrimary, margin: 0 }}>Acceso Seguro</h2>
-                    <p style={{ fontSize: 13, color: theme.textSecondary, margin: '2px 0 0 0' }}>Ingresa tu contraseña para continuar</p>
+                    <p style={{ fontSize: 13, color: theme.textSecondary, margin: '2px 0 0 0' }}>Para ver la contraseña, verifica tu identidad.</p>
                   </div>
                 </div>
 
-                <form onSubmit={handleAuthSubmit}>
-                  <div style={{ marginBottom: 20 }}>
+                <div style={{ marginBottom: 20 }}>
+                  <button type="button" onClick={handleWebAuthnLogin} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', borderRadius: 8, border: 'none', background: '#3b82f6', color: '#fff', fontSize: 15, fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s', marginBottom: 16 }}>
+                    <span style={{ fontSize: 18 }}>👆</span> Usar Huella / FaceID
+                  </button>
+
+                  <div style={{ textAlign: 'center', marginBottom: 16, color: theme.textSecondary, fontSize: 13 }}>
+                    — O usa tu contraseña de contador —
+                  </div>
+
+                  <form onSubmit={handleAuthSubmit}>
                     <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: theme.textSecondary, marginBottom: 8 }}>Contraseña de contador</label>
                     <input
                       type="password"
@@ -721,115 +831,246 @@ export default function ClientDetailPage() {
                       style={{
                         width: '100%', padding: '10px 14px', borderRadius: 8,
                         border: `1px solid ${authError ? '#EF4444' : theme.inputBorder}`,
-                        fontSize: 15, background: theme.inputBg, color: theme.textPrimary, boxSizing: 'border-box'
+                        fontSize: 15, background: theme.inputBg, color: theme.textPrimary, boxSizing: 'border-box',
+                        marginBottom: 12
                       }}
                     />
-                    {authError && <div style={{ color: '#EF4444', fontSize: 12, marginTop: 6, fontWeight: 500 }}>{authError}</div>}
-                  </div>
 
-                  <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-                    <button type="button" onClick={() => setShowAuthModal(false)} style={{ padding: '9px 16px', borderRadius: 8, border: `1px solid ${theme.cardBorder}`, background: 'transparent', color: theme.textSecondary, fontSize: 14, fontWeight: 500, cursor: 'pointer', transition: 'all 0.2s' }}>
-                      Cancelar
-                    </button>
-                    <button type="submit" style={{ padding: '9px 24px', borderRadius: 8, border: 'none', background: theme.accent, color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer', boxShadow: `0 4px 12px ${theme.accent}40`, transition: 'all 0.2s' }}>
-                      Autorizar
-                    </button>
-                  </div>
-                </form>
+                    <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 8 }}>
+                      <button type="button" onClick={() => setShowAuthModal(false)} style={{ padding: '9px 16px', borderRadius: 8, border: `1px solid ${theme.cardBorder}`, background: 'transparent', color: theme.textSecondary, fontSize: 14, fontWeight: 500, cursor: 'pointer', transition: 'all 0.2s' }}>
+                        Cancelar
+                      </button>
+                      <button type="submit" style={{ padding: '9px 24px', borderRadius: 8, border: 'none', background: theme.accent, color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer', boxShadow: `0 4px 12px ${theme.accent}40`, transition: 'all 0.2s' }}>
+                        Autorizar
+                      </button>
+                    </div>
+                  </form>
+                </div>
+
+                {authError && <div style={{ color: '#EF4444', fontSize: 13, marginTop: 10, fontWeight: 500, textAlign: 'center', background: '#FEF2F2', padding: 8, borderRadius: 6 }}>{authError}</div>}
+
+                <div style={{ borderTop: `1px solid ${theme.cardBorder}`, marginTop: 20, paddingTop: 16, textAlign: 'center' }}>
+                  <button type="button" onClick={handleWebAuthnRegister} style={{ background: 'none', border: 'none', color: theme.accent, fontSize: 13, cursor: 'pointer', textDecoration: 'underline' }}>
+                    + Registrar dispositivo (Passkey)
+                  </button>
+                </div>
               </div>
             </div>
           )}
         </div>
       )}
 
-      {/* ── TAB: HONORARIOS ── */}
+      {/* ── TAB: HONORARIOS & CONTRATOS ── */}
       {tab === 'honorarios' && (
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <p style={{ fontSize: 13, color: theme.textSecondary }}>
-              {honorarios.length} honorario{honorarios.length !== 1 ? 's' : ''} registrado{honorarios.length !== 1 ? 's' : ''}
-            </p>
-            <button onClick={openNewHon} style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '7px 16px', borderRadius: 8, border: 'none',
-              background: theme.accent, color: '#fff', fontSize: 13, fontWeight: 500, cursor: 'pointer',
-            }}>
-              + Nuevo honorario
-            </button>
-          </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
 
-          <div style={{ background: theme.cardBg, borderRadius: 12, boxShadow: theme.cardShadow, overflow: 'hidden', border: `1px solid ${theme.cardBorder}` }}>
-            {honorarios.length === 0 ? (
-              <div style={{ padding: 48, textAlign: 'center' }}>
-                <div style={{ fontSize: 36, marginBottom: 12 }}>💰</div>
-                <div style={{ color: theme.textSecondary, fontSize: 14 }}>No hay honorarios registrados</div>
-                <div style={{ color: theme.textMuted, fontSize: 13, marginTop: 4 }}>Creá el primero con el botón de arriba</div>
+          {/* SECTION: CONTRATOS RECURRENTES */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div>
+                <h3 style={{ fontSize: 16, fontWeight: 700, color: theme.textPrimary, margin: 0 }}>Contratos de Honorarios</h3>
+                <p style={{ fontSize: 13, color: theme.textSecondary, marginTop: 4 }}>
+                  {contratos.length} contrato{contratos.length !== 1 ? 's' : ''} activo{contratos.length !== 1 ? 's' : ''}
+                </p>
               </div>
-            ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ background: theme.tableHeaderBg, borderBottom: `1px solid ${theme.cardBorder}` }}>
-                    {['Período', 'Acordado', 'Cobrado', 'Pendiente', 'Estado', 'Forma de pago', 'Acciones'].map(h => (
-                      <th key={h} style={{ padding: '11px 16px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {honorarios.map((h, i) => {
-                    const estadoColors = {
-                      al_dia: { bg: '#DCFCE7', color: '#15803D', label: 'Al día' },
-                      pendiente: { bg: '#FEF3C7', color: '#D97706', label: 'Pendiente' },
-                      vencido: { bg: '#FEE2E2', color: '#DC2626', label: 'Vencido' },
-                    };
-                    const sc = estadoColors[h.estado] ?? estadoColors.pendiente;
-                    const pendiente = Number(h.montoAcordado) - Number(h.montoCobrado);
-                    return (
-                      <tr key={h.id} style={{ borderBottom: i < honorarios.length - 1 ? `1px solid ${theme.tableBorder}` : 'none' }}>
-                        <td style={{ padding: '13px 16px', fontSize: 14, color: theme.textPrimary, fontWeight: 600 }}>{h.periodo}</td>
+              <button onClick={openNewContract} style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '7px 16px', borderRadius: 8, border: 'none',
+                background: theme.accent, color: '#fff', fontSize: 13, fontWeight: 500, cursor: 'pointer',
+              }}>
+                + Nuevo contrato
+              </button>
+            </div>
+
+            <div style={{ background: theme.cardBg, borderRadius: 12, boxShadow: theme.cardShadow, overflow: 'hidden', border: `1px solid ${theme.cardBorder}` }}>
+              {contratos.length === 0 ? (
+                <div style={{ padding: 48, textAlign: 'center' }}>
+                  <div style={{ fontSize: 36, marginBottom: 12 }}>🧾</div>
+                  <div style={{ color: theme.textSecondary, fontSize: 14 }}>No hay contratos recurrentes configurados</div>
+                  <div style={{ color: theme.textMuted, fontSize: 13, marginTop: 4 }}>Crea un contrato mensual, anual o de cargo único para generar deudas automáticamente.</div>
+                </div>
+              ) : (
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: theme.tableHeaderBg, borderBottom: `1px solid ${theme.cardBorder}` }}>
+                      {['Frecuencia', 'Monto', 'Inicio', 'Fin', 'Estado', 'Acciones'].map(h => (
+                        <th key={h} style={{ padding: '11px 16px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {contratos.map((c, i) => (
+                      <tr key={c.id} style={{ borderBottom: i < contratos.length - 1 ? `1px solid ${theme.tableBorder}` : 'none' }}>
+                        <td style={{ padding: '13px 16px', fontSize: 14, color: theme.textPrimary, fontWeight: 600, textTransform: 'capitalize' }}>
+                          {c.frecuencia}
+                        </td>
                         <td style={{ padding: '13px 16px', fontSize: 14, color: theme.textPrimary }}>
-                          ${Number(h.montoAcordado).toLocaleString('es-UY')}
+                          ${Number(c.monto).toLocaleString('es-UY')}
                         </td>
-                        <td style={{ padding: '13px 16px', fontSize: 14, color: '#15803D', fontWeight: 500 }}>
-                          ${Number(h.montoCobrado).toLocaleString('es-UY')}
+                        <td style={{ padding: '13px 16px', fontSize: 14, color: theme.textPrimary }}>
+                          {new Date(c.fechaInicio).toLocaleDateString('es-UY')}
                         </td>
-                        <td style={{ padding: '13px 16px', fontSize: 14, color: pendiente > 0 ? '#D97706' : theme.textMuted, fontWeight: pendiente > 0 ? 600 : 400 }}>
-                          {pendiente > 0 ? `${pendiente.toLocaleString('es-UY')}` : '—'}
+                        <td style={{ padding: '13px 16px', fontSize: 14, color: theme.textSecondary }}>
+                          {c.fechaFin ? new Date(c.fechaFin).toLocaleDateString('es-UY') : 'Indefinido'}
                         </td>
                         <td style={{ padding: '13px 16px' }}>
-                          <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 500, background: sc.bg, color: sc.color }}>
-                            {sc.label}
+                          <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 500, background: c.activo ? '#DCFCE7' : '#FEE2E2', color: c.activo ? '#15803D' : '#DC2626' }}>
+                            {c.activo ? 'Activo' : 'Inactivo'}
                           </span>
-                        </td>
-                        <td style={{ padding: '13px 16px', fontSize: 13, color: theme.textSecondary }}>
-                          {h.formaPago ? h.formaPago.charAt(0).toUpperCase() + h.formaPago.slice(1) : '—'}
                         </td>
                         <td style={{ padding: '13px 16px' }}>
                           <div style={{ display: 'flex', gap: 6 }}>
-                            {h.estado !== 'al_dia' && (
-                              <button onClick={() => openPago(h)} title="Registrar pago"
-                                style={{ padding: '4px 10px', borderRadius: 6, border: 'none', background: '#DCFCE7', color: '#15803D', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-                                💳 Pagar
-                              </button>
-                            )}
-                            <button onClick={() => openEditHon(h)} title="Editar"
+                            <button onClick={() => openEditContract(c)} title="Editar"
                               style={{ padding: '4px 8px', borderRadius: 6, border: `1px solid ${theme.cardBorder}`, background: theme.cardBg, cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
                               <svg width="13" height="13" fill="none" stroke={theme.textSecondary} strokeWidth="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
                             </button>
-                            <button onClick={() => handleDeleteHon(h.id)} title="Eliminar"
-                              style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #FEE2E2', background: '#FFF5F5', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-                              <svg width="13" height="13" fill="none" stroke="#DC2626" strokeWidth="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></svg>
-                            </button>
+                            {c.activo && (
+                              <button onClick={() => handleDeleteContract(c.id)} title="Desactivar"
+                                style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #FEE2E2', background: '#FFF5F5', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                                <svg width="13" height="13" fill="none" stroke="#DC2626" strokeWidth="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></svg>
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            )}
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
           </div>
 
-          {/* Modal nuevo/editar honorario */}
+          <hr style={{ border: 'none', borderTop: `1px solid ${theme.cardBorder}` }} />
+
+          {/* SECTION: CUOTAS / HONORARIOS ASIGNADOS */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div>
+                <h3 style={{ fontSize: 16, fontWeight: 700, color: theme.textPrimary, margin: 0 }}>Historial de Deudas y Cuotas</h3>
+                <p style={{ fontSize: 13, color: theme.textSecondary, marginTop: 4 }}>
+                  {honorarios.length} registro{honorarios.length !== 1 ? 's' : ''} generado{honorarios.length !== 1 ? 's' : ''}
+                </p>
+              </div>
+              <button onClick={openNewHon} style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '7px 16px', borderRadius: 8, border: `1px solid ${theme.cardBorder}`,
+                background: theme.cardBg, color: theme.textSecondary, fontSize: 13, cursor: 'pointer',
+              }}>
+                + Cargo puntual manual
+              </button>
+            </div>
+
+            <div style={{ background: theme.cardBg, borderRadius: 12, boxShadow: theme.cardShadow, overflow: 'hidden', border: `1px solid ${theme.cardBorder}` }}>
+              {honorarios.length === 0 ? (
+                <div style={{ padding: 48, textAlign: 'center' }}>
+                  <div style={{ fontSize: 36, marginBottom: 12 }}>💰</div>
+                  <div style={{ color: theme.textSecondary, fontSize: 14 }}>No hay honorarios registrados</div>
+                  <div style={{ color: theme.textMuted, fontSize: 13, marginTop: 4 }}>Creá el primero con el botón de arriba</div>
+                </div>
+              ) : (
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: theme.tableHeaderBg, borderBottom: `1px solid ${theme.cardBorder}` }}>
+                      {['Período', 'Acordado', 'Cobrado', 'Pendiente', 'Estado', 'Forma de pago', 'Acciones'].map(h => (
+                        <th key={h} style={{ padding: '11px 16px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {honorarios.map((h, i) => {
+                      const estadoColors = {
+                        al_dia: { bg: '#DCFCE7', color: '#15803D', label: 'Al día' },
+                        pago_informado: { bg: '#DBEAFE', color: '#1D4ED8', label: 'Pago informado' },
+                        pendiente: { bg: '#FEF3C7', color: '#D97706', label: 'Pendiente' },
+                        vencido: { bg: '#FEE2E2', color: '#DC2626', label: 'Vencido' },
+                      };
+                      const sc = estadoColors[h.estado] ?? estadoColors.pendiente;
+                      const pendiente = Number(h.montoAcordado) - Number(h.montoCobrado);
+                      return (
+                        <tr key={h.id} style={{ borderBottom: i < honorarios.length - 1 ? `1px solid ${theme.tableBorder}` : 'none' }}>
+                          <td style={{ padding: '13px 16px', fontSize: 14, color: theme.textPrimary, fontWeight: 600 }}>{h.periodo}</td>
+                          <td style={{ padding: '13px 16px', fontSize: 14, color: theme.textPrimary }}>
+                            ${Number(h.montoAcordado).toLocaleString('es-UY')}
+                          </td>
+                          <td style={{ padding: '13px 16px', fontSize: 14, color: '#15803D', fontWeight: 500 }}>
+                            ${Number(h.montoCobrado).toLocaleString('es-UY')}
+                          </td>
+                          <td style={{ padding: '13px 16px', fontSize: 14, color: pendiente > 0 ? '#D97706' : theme.textMuted, fontWeight: pendiente > 0 ? 600 : 400 }}>
+                            {pendiente > 0 ? `${pendiente.toLocaleString('es-UY')}` : '—'}
+                          </td>
+                          <td style={{ padding: '13px 16px' }}>
+                            <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 500, background: sc.bg, color: sc.color }}>
+                              {sc.label}
+                            </span>
+                          </td>
+                          <td style={{ padding: '13px 16px', fontSize: 13, color: theme.textSecondary }}>
+                            {h.formaPago ? h.formaPago.charAt(0).toUpperCase() + h.formaPago.slice(1) : '—'}
+                          </td>
+                          <td style={{ padding: '13px 16px' }}>
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              {h.estado !== 'al_dia' && (
+                                <button onClick={() => openPago(h)} title={h.estado === 'pago_informado' ? "Confirmar pago informado por cliente" : "Registrar pago"}
+                                  style={{ padding: '4px 10px', borderRadius: 6, border: 'none', background: h.estado === 'pago_informado' ? '#DBEAFE' : '#DCFCE7', color: h.estado === 'pago_informado' ? '#1D4ED8' : '#15803D', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                                  💳 {h.estado === 'pago_informado' ? 'Confirmar Pago' : 'Pagar'}
+                                </button>
+                              )}
+                              <button onClick={() => openEditHon(h)} title="Editar"
+                                style={{ padding: '4px 8px', borderRadius: 6, border: `1px solid ${theme.cardBorder}`, background: theme.cardBg, cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                                <svg width="13" height="13" fill="none" stroke={theme.textSecondary} strokeWidth="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                              </button>
+                              <button onClick={() => handleDeleteHon(h.id)} title="Eliminar"
+                                style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #FEE2E2', background: '#FFF5F5', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                                <svg width="13" height="13" fill="none" stroke="#DC2626" strokeWidth="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></svg>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+
+          {/* Modal nuevo/editar CONTRATO */}
+          {showContractModal && (
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
+              onClick={e => e.target === e.currentTarget && setShowContractModal(false)}>
+              <div style={{ background: theme.cardBg, borderRadius: 14, padding: '28px', width: 420, boxShadow: '0 20px 40px rgba(0,0,0,0.25)', border: `1px solid ${theme.cardBorder}` }}>
+                <h2 style={{ fontSize: 17, fontWeight: 700, color: theme.textPrimary, marginBottom: 20 }}>
+                  {contractEditId ? 'Editar contrato' : 'Nuevo contrato de honorarios'}
+                </h2>
+                <form onSubmit={handleSaveContract}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: theme.textSecondary, marginBottom: 5 }}>Frecuencia</label>
+                      <select value={contractForm.frecuencia} onChange={e => setContractForm(f => ({ ...f, frecuencia: e.target.value as FeeFrecuencia }))}
+                        style={{ width: '100%', padding: '8px 11px', borderRadius: 7, border: `1px solid ${theme.inputBorder}`, fontSize: 14, background: theme.inputBg, color: theme.textPrimary, boxSizing: 'border-box' }}>
+                        <option value="mensual">Mensual</option>
+                        <option value="anual">Anual</option>
+                        <option value="semanal">Semanal</option>
+                        <option value="unico">Cargo Único (Puntual)</option>
+                      </select>
+                    </div>
+                    <HonField label="Monto a facturar ($)" value={contractForm.monto} onChange={v => setContractForm(f => ({ ...f, monto: v }))} type="number" required />
+                    <HonField label="Fecha de Inicio" value={contractForm.fechaInicio} onChange={v => setContractForm(f => ({ ...f, fechaInicio: v }))} type="date" required />
+                    <HonField label="Fecha de Fin (opcional)" value={contractForm.fechaFin} onChange={v => setContractForm(f => ({ ...f, fechaFin: v }))} type="date" />
+                    <HonField label="Notas" value={contractForm.notas} onChange={v => setContractForm(f => ({ ...f, notas: v }))} />
+                  </div>
+                  {contractError && <div style={{ background: '#FEE2E2', color: '#DC2626', borderRadius: 7, padding: '8px 12px', fontSize: 13, marginTop: 12 }}>{contractError}</div>}
+                  <div style={{ display: 'flex', gap: 10, marginTop: 20, justifyContent: 'flex-end' }}>
+                    <button type="button" onClick={() => setShowContractModal(false)} style={{ padding: '8px 18px', borderRadius: 7, border: `1px solid ${theme.cardBorder}`, background: theme.cardBg, color: theme.textSecondary, fontSize: 14, cursor: 'pointer' }}>Cancelar</button>
+                    <button type="submit" disabled={savingContract} style={{ padding: '8px 20px', borderRadius: 7, border: 'none', background: theme.accent, color: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer', opacity: savingContract ? 0.7 : 1 }}>
+                      {savingContract ? 'Guardando...' : contractEditId ? 'Guardar cambios' : 'Crear contrato'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* Modal nuevo/editar cargo manual */}
           {showHonModal && (
             <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
               onClick={e => e.target === e.currentTarget && setShowHonModal(false)}>
@@ -1092,13 +1333,13 @@ export default function ClientDetailPage() {
 }
 
 // ── Small field components (usan theme del store via prop o fallback neutral) ──
-function CredField({ label, value, onChange, type = 'text', theme }: { label: string; value: string; onChange: (v: string) => void; type?: string; theme?: any }) {
+function CredField({ label, value, onChange, type = 'text', theme, placeholder }: { label: string; value: string; onChange: (v: string) => void; type?: string; theme?: any; placeholder?: string }) {
   const { theme: storeTheme } = useThemeStore();
   const t = theme ?? storeTheme;
   return (
     <div>
       <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: t.textSecondary, marginBottom: 5 }}>{label}</label>
-      <input type={type} value={value} onChange={e => onChange(e.target.value)}
+      <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
         style={{ width: '100%', padding: '8px 11px', borderRadius: 7, border: `1px solid ${t.inputBorder}`, fontSize: 14, color: t.textPrimary, background: t.inputBg, outline: 'none', boxSizing: 'border-box' as const }}
         onFocus={e => (e.target.style.borderColor = t.accent)}
         onBlur={e => (e.target.style.borderColor = t.inputBorder)} />

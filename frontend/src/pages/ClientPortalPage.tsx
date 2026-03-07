@@ -5,25 +5,26 @@ import api from '../services/api';
 import { Vencimiento, EstadoVencimiento, Honorario, EstadoHonorario } from '../types';
 
 const ESTADO_VENC: Record<EstadoVencimiento, { bg: string; color: string; label: string }> = {
-  pendiente:  { bg: '#FEF3C7', color: '#D97706', label: 'Pendiente' },
-  alertado:   { bg: '#FEE2E2', color: '#DC2626', label: 'Por vencer' },
-  vencido:    { bg: '#FEE2E2', color: '#DC2626', label: 'Vencido' },
+  pendiente: { bg: '#FEF3C7', color: '#D97706', label: 'Pendiente' },
+  alertado: { bg: '#FEE2E2', color: '#DC2626', label: 'Por vencer' },
+  vencido: { bg: '#FEE2E2', color: '#DC2626', label: 'Vencido' },
   completado: { bg: '#DCFCE7', color: '#15803D', label: 'Completado' },
 };
 
 const ESTADO_HON: Record<EstadoHonorario, { bg: string; color: string; label: string }> = {
-  al_dia:    { bg: '#DCFCE7', color: '#15803D', label: 'Al día' },
+  al_dia: { bg: '#DCFCE7', color: '#15803D', label: 'Al día' },
+  pago_informado: { bg: '#DBEAFE', color: '#1D4ED8', label: 'Verificando pago' },
   pendiente: { bg: '#FEF3C7', color: '#D97706', label: 'Pendiente' },
-  vencido:   { bg: '#FEE2E2', color: '#DC2626', label: 'Vencido' },
+  vencido: { bg: '#FEE2E2', color: '#DC2626', label: 'Vencido' },
 };
 
 export default function ClientPortalPage() {
   const { theme } = useThemeStore();
   const user = useAuthStore(s => s.user);
   const [vencimientos, setVencimientos] = useState<Vencimiento[]>([]);
-  const [honorarios, setHonorarios]     = useState<Honorario[]>([]);
-  const [loading, setLoading]           = useState(true);
-  const [clientId, setClientId]         = useState<string | null>(null);
+  const [honorarios, setHonorarios] = useState<Honorario[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [clientId, setClientId] = useState<string | null>(null);
 
   useEffect(() => {
     // Para el rol cliente, el backend debería devolver el cliente asociado al usuario
@@ -39,9 +40,19 @@ export default function ClientPortalPage() {
         setVencimientos(v.data);
         setHonorarios(h.data);
       })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoading(false));
   }, []);
+
+  const handleInformarPago = async (h: Honorario) => {
+    if (!confirm(`¿Confirmar que enviaste el pago para el mes de ${h.periodo}?`)) return;
+    try {
+      await api.patch(`/fees/${h.id}/informar-pago`);
+      setHonorarios(prev => prev.map(x => x.id === h.id ? { ...x, estado: 'pago_informado' } : x));
+    } catch (error) {
+      alert('Error al informar pago');
+    }
+  };
 
   const proximos = vencimientos
     .filter(v => v.estado !== 'completado')
@@ -49,7 +60,7 @@ export default function ClientPortalPage() {
     .slice(0, 8);
 
   const honPendientes = honorarios.filter(h => h.estado !== 'al_dia');
-  const totalDeuda    = honPendientes.reduce((s, h) => s + (Number(h.montoAcordado) - Number(h.montoCobrado)), 0);
+  const totalDeuda = honPendientes.reduce((s, h) => s + (Number(h.montoAcordado) - Number(h.montoCobrado)), 0);
 
   const fmt = (n: number) => `$${n.toLocaleString('es-UY')}`;
 
@@ -177,9 +188,18 @@ export default function ClientPortalPage() {
                       Debe: {fmt(pendiente)}
                     </span>
                   )}
-                  <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 500, background: sc.bg, color: sc.color }}>
-                    {sc.label}
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 500, background: sc.bg, color: sc.color }}>
+                      {sc.label}
+                    </span>
+                    {(h.estado === 'pendiente' || h.estado === 'vencido') && (
+                      <button
+                        onClick={() => handleInformarPago(h)}
+                        style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #94A3B8', background: 'transparent', color: '#475569', fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}>
+                        Enviar comprobante
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })}

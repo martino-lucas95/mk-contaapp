@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Put, Delete, Patch, Param, Body, Query, UseGuards, Request } from '@nestjs/common';
-import { FeesService, CreateHonorarioDto } from './fees.service';
+import { FeesService, CreateHonorarioDto, CreateFeeContractDto } from './fees.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard, Roles } from '../../common/guards/roles.guard';
 import { UserRole } from '../users/user.entity';
@@ -8,7 +8,7 @@ import { FormaPago } from './honorario.entity';
 @Controller('fees')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class FeesController {
-  constructor(private feesService: FeesService) {}
+  constructor(private feesService: FeesService) { }
 
   /** Resumen global para el dashboard del contador */
   @Get('resumen')
@@ -40,6 +40,12 @@ export class FeesController {
     return this.feesService.registrarPago(id, body);
   }
 
+  /** Informar pago por parte del cliente */
+  @Patch(':id/informar-pago')
+  informarPago(@Param('id') id: string) {
+    return this.feesService.informarPago(id);
+  }
+
   /** Actualizar honorario */
   @Put(':id')
   @Roles(UserRole.ADMIN, UserRole.CONTADOR)
@@ -59,5 +65,30 @@ export class FeesController {
   @Roles(UserRole.ADMIN)
   marcarVencidos(@Query('dias') dias?: string) {
     return this.feesService.marcarVencidos(dias ? parseInt(dias) : 30);
+  }
+
+  // ── Contratos (Recurrentes) ──
+
+  @Get('client/:clientId/contracts')
+  getContracts(@Param('clientId') clientId: string) {
+    return this.feesService.getContracts(clientId);
+  }
+
+  @Post('client/:clientId/contracts')
+  @Roles(UserRole.ADMIN, UserRole.CONTADOR)
+  createContract(@Param('clientId') clientId: string, @Body() dto: CreateFeeContractDto) {
+    return this.feesService.createContract(clientId, dto);
+  }
+
+  @Put('contracts/:id')
+  @Roles(UserRole.ADMIN, UserRole.CONTADOR)
+  updateContract(@Param('id') id: string, @Body() dto: Partial<CreateFeeContractDto>) {
+    return this.feesService.updateContract(id, dto);
+  }
+
+  @Delete('contracts/:id')
+  @Roles(UserRole.ADMIN, UserRole.CONTADOR)
+  deleteContract(@Param('id') id: string) {
+    return this.feesService.deleteContract(id);
   }
 }

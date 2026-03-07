@@ -5,11 +5,13 @@ import { WebauthnService } from './webauthn.service';
 import { User } from '../../modules/users/user.entity';
 import { Passkey } from '../../modules/users/passkey.entity';
 import { UsersModule } from '../../modules/users/users.module';
+import { AuthModule } from '../../modules/auth/auth.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([User, Passkey]),
     UsersModule,
+    AuthModule,
   ],
   controllers: [WebauthnController],
   providers: [WebauthnService]

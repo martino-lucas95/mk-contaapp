@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { clientsApi, credentialsApi } from '../services/api';
+import { startRegistration, startAuthentication } from '@simplewebauthn/browser';
+import { clientsApi, credentialsApi, authApi } from '../services/api';
+import { useAuthStore } from '../store/auth.store';
 import { useThemeStore } from '../store/theme.store';
 import { Client, Credential, PlataformaCredencial } from '../types';
 
@@ -21,6 +23,7 @@ const PLATAFORMA_LABEL: Record<PlataformaCredencial, string> = {
   cjppu: 'CJPPU',
   fonasa: 'FONASA',
   banco: 'Banco',
+  'gub.uy': 'Gub.uy',
   otro: 'Otro',
 };
 
@@ -31,6 +34,7 @@ const PLATAFORMA_COLOR: Record<PlataformaCredencial, string> = {
   cjppu: '#92400E',
   fonasa: '#1D4ED8',
   banco: '#374151',
+  'gub.uy': '#0F172A',
   otro: '#475569',
 };
 
@@ -56,23 +60,97 @@ export default function CredentialsPage() {
           try {
             const { data } = await credentialsApi.getByClient(c.id);
             data.forEach((cr: Credential) => allCreds.push({ ...cr, clienteNombre: `${c.nombre} ${c.apellido}`, clienteId: c.id }));
-          } catch {}
+          } catch { }
         })
       );
       setCredentials(allCreds);
     }).finally(() => setLoading(false));
   }, []);
 
+  const { credentialsToken, setCredentialsToken } = useAuthStore();
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authPassword, setAuthPassword] = useState('');
+  const [authError, setAuthError] = useState('');
+  const [pendingRevealId, setPendingRevealId] = useState<string | null>(null);
+
   const handleReveal = async (credId: string) => {
     if (revealed[credId]) {
       setRevealed(r => { const n = { ...r }; delete n[credId]; return n; });
       return;
     }
+
+    if (!credentialsToken) {
+      setPendingRevealId(credId);
+      setShowAuthModal(true);
+      return;
+    }
+
+    await performReveal(credId, credentialsToken);
+  };
+
+  const performReveal = async (credId: string, token: string) => {
     setRevealing(credId);
     try {
-      const { data } = await credentialsApi.reveal(credId);
+      const { data } = await credentialsApi.reveal(credId, token);
       setRevealed(r => ({ ...r, [credId]: data.password }));
+    } catch (err: any) {
+      if (err.response?.status === 401) {
+        setPendingRevealId(credId);
+        setShowAuthModal(true);
+      } else {
+        alert('Error al visualizar contraseña');
+      }
     } finally { setRevealing(null); }
+  };
+
+  const handleAuthSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError('');
+    try {
+      const { data } = await authApi.getCredentialsToken(authPassword);
+      setCredentialsToken(data.token);
+      setShowAuthModal(false);
+      setAuthPassword('');
+      if (pendingRevealId) {
+        await performReveal(pendingRevealId, data.token);
+        setPendingRevealId(null);
+      }
+    } catch (err: any) {
+      setAuthError('Contraseña incorrecta');
+    }
+  };
+
+  const handleWebAuthnRegister = async () => {
+    try {
+      setAuthError('');
+      const opts = await authApi.webauthnRegisterOptions();
+      const attResp = await startRegistration(opts.data);
+      await authApi.webauthnRegisterVerify(attResp);
+      alert('Dispositivo registrado correctamente con Huella/FaceID');
+    } catch (error: any) {
+      if (error.name !== 'NotAllowedError') {
+        setAuthError('Error al registrar dispositivo: ' + error.message);
+      }
+    }
+  };
+
+  const handleWebAuthnLogin = async () => {
+    try {
+      setAuthError('');
+      const opts = await authApi.webauthnLoginOptions();
+      const asseResp = await startAuthentication(opts.data);
+      const { data } = await authApi.webauthnLoginVerify(asseResp);
+      setCredentialsToken(data.token);
+      setShowAuthModal(false);
+      if (pendingRevealId) {
+        await performReveal(pendingRevealId, data.token);
+        setPendingRevealId(null);
+      }
+    } catch (error: any) {
+      if (error.name !== 'NotAllowedError') {
+        setAuthError('Error en autenticación biométrica: ' + error.message);
+      }
+    }
   };
 
   const handleDelete = async (credId: string) => {
@@ -217,6 +295,69 @@ export default function CredentialsPage() {
             </div>
           );
         })
+      )}
+
+      {/* Modal Autenticación Contador para ver credenciales */}
+      {showAuthModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, backdropFilter: 'blur(2px)' }}
+          onClick={e => e.target === e.currentTarget && setShowAuthModal(false)}>
+          <div style={{ background: theme.cardBg, borderRadius: 16, padding: '32px', width: 400, boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', border: `1px solid ${theme.cardBorder}` }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+              <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#FEF2F2', color: '#DC2626', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
+                🔒
+              </div>
+              <div>
+                <h2 style={{ fontSize: 18, fontWeight: 700, color: theme.textPrimary, margin: 0 }}>Acceso Seguro</h2>
+                <p style={{ fontSize: 13, color: theme.textSecondary, margin: '2px 0 0 0' }}>Para ver la contraseña, verifica tu identidad.</p>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 20 }}>
+              <button type="button" onClick={handleWebAuthnLogin} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', borderRadius: 8, border: 'none', background: '#3b82f6', color: '#fff', fontSize: 15, fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s', marginBottom: 16 }}>
+                <span style={{ fontSize: 18 }}>👆</span> Usar Huella / FaceID
+              </button>
+
+              <div style={{ textAlign: 'center', marginBottom: 16, color: theme.textSecondary, fontSize: 13 }}>
+                — O usa tu contraseña de contador —
+              </div>
+
+              <form onSubmit={handleAuthSubmit}>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: theme.textSecondary, marginBottom: 8 }}>Contraseña de contador</label>
+                <input
+                  type="password"
+                  value={authPassword}
+                  onChange={e => setAuthPassword(e.target.value)}
+                  placeholder="••••••••"
+                  autoFocus
+                  required
+                  style={{
+                    width: '100%', padding: '10px 14px', borderRadius: 8,
+                    border: `1px solid ${authError ? '#EF4444' : theme.inputBorder}`,
+                    fontSize: 15, background: theme.inputBg, color: theme.textPrimary, boxSizing: 'border-box',
+                    marginBottom: 12
+                  }}
+                />
+
+                <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 8 }}>
+                  <button type="button" onClick={() => setShowAuthModal(false)} style={{ padding: '9px 16px', borderRadius: 8, border: `1px solid ${theme.cardBorder}`, background: 'transparent', color: theme.textSecondary, fontSize: 14, fontWeight: 500, cursor: 'pointer', transition: 'all 0.2s' }}>
+                    Cancelar
+                  </button>
+                  <button type="submit" style={{ padding: '9px 24px', borderRadius: 8, border: 'none', background: theme.accent, color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer', boxShadow: `0 4px 12px ${theme.accent}40`, transition: 'all 0.2s' }}>
+                    Autorizar
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {authError && <div style={{ color: '#EF4444', fontSize: 13, marginTop: 10, fontWeight: 500, textAlign: 'center', background: '#FEF2F2', padding: 8, borderRadius: 6 }}>{authError}</div>}
+
+            <div style={{ borderTop: `1px solid ${theme.cardBorder}`, marginTop: 20, paddingTop: 16, textAlign: 'center' }}>
+              <button type="button" onClick={handleWebAuthnRegister} style={{ background: 'none', border: 'none', color: theme.accent, fontSize: 13, cursor: 'pointer', textDecoration: 'underline' }}>
+                + Registrar dispositivo (Passkey)
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

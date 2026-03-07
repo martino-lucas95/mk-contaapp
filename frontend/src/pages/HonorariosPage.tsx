@@ -7,17 +7,18 @@ import { Client, Honorario, EstadoHonorario } from '../types';
 type HonConCliente = Honorario & { clienteNombre?: string; clienteId?: string };
 
 const ESTADO_CONFIG: Record<EstadoHonorario, { bg: string; color: string; label: string }> = {
-  al_dia:    { bg: '#DCFCE7', color: '#15803D', label: 'Al día' },
+  al_dia: { bg: '#DCFCE7', color: '#15803D', label: 'Al día' },
+  pago_informado: { bg: '#DBEAFE', color: '#1D4ED8', label: 'Pago informado' },
   pendiente: { bg: '#FEF3C7', color: '#D97706', label: 'Pendiente' },
-  vencido:   { bg: '#FEE2E2', color: '#DC2626', label: 'Vencido' },
+  vencido: { bg: '#FEE2E2', color: '#DC2626', label: 'Vencido' },
 };
 
-const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
 export default function HonorariosPage() {
   const { theme } = useThemeStore();
   const [honorarios, setHonorarios] = useState<HonConCliente[]>([]);
-  const [loading, setLoading]       = useState(true);
+  const [loading, setLoading] = useState(true);
   const [filtroEstado, setFiltroEstado] = useState<EstadoHonorario | 'todos'>('todos');
   const [filtroPeriodo, setFiltroPeriodo] = useState('');
 
@@ -32,7 +33,7 @@ export default function HonorariosPage() {
             clienteNombre: `${c.nombre} ${c.apellido}`,
             clienteId: c.id,
           }));
-        } catch {}
+        } catch { }
       }));
       // Ordenar por período descendente
       all.sort((a, b) => b.periodo.localeCompare(a.periodo));
@@ -47,8 +48,8 @@ export default function HonorariosPage() {
   });
 
   // KPIs
-  const totalAcordado  = filtered.reduce((s, h) => s + Number(h.montoAcordado), 0);
-  const totalCobrado   = filtered.reduce((s, h) => s + Number(h.montoCobrado), 0);
+  const totalAcordado = filtered.reduce((s, h) => s + Number(h.montoAcordado), 0);
+  const totalCobrado = filtered.reduce((s, h) => s + Number(h.montoCobrado), 0);
   const totalPendiente = totalAcordado - totalCobrado;
   const countPendiente = honorarios.filter(h => h.estado !== 'al_dia').length;
 
@@ -74,10 +75,10 @@ export default function HonorariosPage() {
       {!loading && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 24 }}>
           {[
-            { label: 'Total acordado',  value: fmt(totalAcordado),  color: theme.accent,  icon: '📋' },
-            { label: 'Total cobrado',   value: fmt(totalCobrado),   color: '#15803D',     icon: '✅' },
-            { label: 'Total pendiente', value: fmt(totalPendiente), color: '#D97706',     icon: '⏳' },
-            { label: 'Sin cobrar',      value: `${countPendiente} honorarios`, color: '#DC2626', icon: '⚠️' },
+            { label: 'Total acordado', value: fmt(totalAcordado), color: theme.accent, icon: '📋' },
+            { label: 'Total cobrado', value: fmt(totalCobrado), color: '#15803D', icon: '✅' },
+            { label: 'Total pendiente', value: fmt(totalPendiente), color: '#D97706', icon: '⏳' },
+            { label: 'Sin cobrar', value: `${countPendiente} honorarios`, color: '#DC2626', icon: '⚠️' },
           ].map(({ label, value, color, icon }) => (
             <div key={label} style={{
               background: theme.cardBg, borderRadius: 10, padding: '16px 20px',
@@ -101,6 +102,7 @@ export default function HonorariosPage() {
         >
           <option value="todos">Todos los estados</option>
           <option value="al_dia">Al día</option>
+          <option value="pago_informado">Pago informado</option>
           <option value="pendiente">Pendiente</option>
           <option value="vencido">Vencido</option>
         </select>
@@ -158,7 +160,7 @@ export default function HonorariosPage() {
                       </Link>
                     </td>
                     <td style={{ padding: '13px 16px', fontSize: 13, color: theme.textSecondary, fontWeight: 600 }}>
-                      {(() => { const [y, m] = h.periodo.split('-'); return `${MESES[parseInt(m)-1]} ${y}`; })()}
+                      {(() => { const [y, m] = h.periodo.split('-'); return `${MESES[parseInt(m) - 1]} ${y}`; })()}
                     </td>
                     <td style={{ padding: '13px 16px', fontSize: 14, color: theme.textPrimary }}>
                       {fmt(Number(h.montoAcordado))}

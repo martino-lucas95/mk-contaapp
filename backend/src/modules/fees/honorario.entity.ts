@@ -3,9 +3,11 @@ import {
   UpdateDateColumn, ManyToOne, JoinColumn,
 } from 'typeorm';
 import { Client } from '../clients/client.entity';
+import { FeeContract } from './fee-contract.entity';
 
 export enum EstadoHonorario {
-  AL_DIA = 'al_dia',
+  AL_DIA = 'al_dia', // Pagado y confirmado por contador
+  PAGO_INFORMADO = 'pago_informado', // Cliente marcó que pagó
   PENDIENTE = 'pendiente',
   VENCIDO = 'vencido',
 }
@@ -27,6 +29,13 @@ export class Honorario {
 
   @Column({ name: 'client_id' })
   clientId: string;
+
+  @ManyToOne(() => FeeContract, (contract) => contract.honorarios, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'fee_contract_id' })
+  feeContract: FeeContract;
+
+  @Column({ name: 'fee_contract_id', nullable: true })
+  feeContractId: string;
 
   // Período: ej "2026-02"
   @Column({ length: 7 })

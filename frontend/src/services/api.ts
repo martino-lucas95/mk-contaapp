@@ -37,6 +37,10 @@ export const authApi = {
   login: (email: string, password: string) => api.post('/auth/login', { email, password }),
   refresh: (refreshToken: string) => api.post('/auth/refresh', { refreshToken }),
   getCredentialsToken: (password: string) => api.post('/auth/credentials-token', { password }),
+  webauthnRegisterOptions: () => api.get('/auth/webauthn/register/options'),
+  webauthnRegisterVerify: (data: any) => api.post('/auth/webauthn/register/verify', data),
+  webauthnLoginOptions: () => api.get('/auth/webauthn/login/options'),
+  webauthnLoginVerify: (data: any) => api.post('/auth/webauthn/login/verify', data),
 };
 
 // ── Users (admin) ─────────────────────────────────────────────────────────────
@@ -83,7 +87,14 @@ export const feesApi = {
   create: (clientId: string, data: any) => api.post(`/fees/client/${clientId}`, data),
   update: (id: string, data: any) => api.put(`/fees/${id}`, data),
   marcarPago: (id: string, data: any) => api.patch(`/fees/${id}/pago`, data),
+  informarPago: (id: string) => api.patch(`/fees/${id}/informar-pago`),
   delete: (id: string) => api.delete(`/fees/${id}`),
+
+  // Contratos recurrentes
+  getContracts: (clientId: string) => api.get(`/fees/client/${clientId}/contracts`),
+  createContract: (clientId: string, data: any) => api.post(`/fees/client/${clientId}/contracts`, data),
+  updateContract: (id: string, data: any) => api.put(`/fees/contracts/${id}`, data),
+  deleteContract: (id: string) => api.delete(`/fees/contracts/${id}`),
 };
 
 // ── Movimientos ──────────────────────────────────────────────────────────────

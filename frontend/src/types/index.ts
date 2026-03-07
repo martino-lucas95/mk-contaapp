@@ -12,9 +12,22 @@ export type EstadoVencimiento = 'pendiente' | 'completado' | 'vencido' | 'alerta
 export interface Vencimiento { id: string; clientId: string; tipo: TipoVencimiento; descripcion?: string; fechaVencimiento: string; periodo?: string; estado: EstadoVencimiento; notas?: string; esPersonalizado: boolean; }
 export type EstadoBoleto = 'pendiente_emitir' | 'emitido' | 'pagado' | 'vencido';
 export interface BoletoPago { id: string; clientId: string; tipoImpuesto: TipoVencimiento; periodo: string; monto?: number; estado: EstadoBoleto; fechaEmision?: string; fechaVencimiento?: string; fechaPago?: string; confirmadoPorId?: string; notas?: string; }
-export type EstadoHonorario = 'al_dia' | 'pendiente' | 'vencido';
+export type EstadoHonorario = 'al_dia' | 'pago_informado' | 'pendiente' | 'vencido';
 export type FormaPago = 'efectivo' | 'transferencia' | 'otro';
-export interface Honorario { id: string; clientId: string; periodo: string; montoAcordado: number; montoCobrado: number; fechaCobro?: string; formaPago?: FormaPago; estado: EstadoHonorario; notas?: string; }
+export interface Honorario { id: string; clientId: string; feeContractId?: string; periodo: string; montoAcordado: number; montoCobrado: number; fechaCobro?: string; formaPago?: FormaPago; estado: EstadoHonorario; notas?: string; }
+
+export type FeeFrecuencia = 'mensual' | 'anual' | 'semanal' | 'unico';
+export interface FeeContract {
+    id: string;
+    clientId: string;
+    frecuencia: FeeFrecuencia;
+    monto: number;
+    fechaInicio: string;
+    fechaFin?: string;
+    activo: boolean;
+    notas?: string;
+    createdAt?: string;
+}
 export type TipoMovimiento = 'venta' | 'compra' | 'gasto';
 export interface Movimiento { id: string; clientId: string; tipo: TipoMovimiento; fecha: string; descripcion?: string; monto: number; ivaIncluido: boolean; tasaIva?: number; categoria?: string; nroComprobante?: string; adjuntoUrl?: string; notas?: string; }
 export type TipoNotificacion = 'vencimiento_proximo' | 'boleto_pendiente' | 'honorario_vencido' | 'pago_confirmado' | 'consulta_recibida' | 'consulta_respondida' | 'sistema';
