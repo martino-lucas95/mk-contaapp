@@ -32,12 +32,14 @@ const Icons = {
   movimientos:    <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>,
 };
 
-const NAV_ADMIN    = [
+type NavItem = { to: string; label: string; icon: JSX.Element; exact?: boolean };
+
+const NAV_ADMIN: NavItem[] = [
   { to: '/admin',            label: 'Dashboard',   icon: Icons.dashboard,   exact: true },
   { to: '/admin/contadores', label: 'Contadores',  icon: Icons.users },
 ];
-const NAV_CONTADOR = [
-  { to: '/dashboard',      label: 'Dashboard',    icon: Icons.dashboard },
+const NAV_CONTADOR: NavItem[] = [
+  { to: '/dashboard',      label: 'Dashboard',    icon: Icons.dashboard,  exact: true },
   { to: '/clients',        label: 'Clientes',     icon: Icons.clients },
   { to: '/calendar',       label: 'Vencimientos', icon: Icons.calendar },
   { to: '/credentials',    label: 'Credenciales', icon: Icons.credentials },
