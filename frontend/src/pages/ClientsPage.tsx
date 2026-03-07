@@ -183,9 +183,20 @@ function ClientModal({
         const { data } = await clientsApi.create(payload);
         finalId = data.id;
       }
-      
+
       if (form.crearUsuario && finalId && form.email && form.userPassword) {
-        await clientsApi.createUser(finalId, { email: form.email, password: form.userPassword });
+        try {
+          await clientsApi.createUser(finalId, {
+            email: form.email,
+            password: form.userPassword
+          });
+        } catch (userErr: any) {
+          setError(`Cliente guardado, pero error al crear usuario: ${userErr?.response?.data?.message || 'Error desconocido'}`);
+          onSave(); // Refrescar lista igual ya que el cliente se guardó
+          // No cerramos el modal para que el usuario proceda o corrija el email/pass
+          setSaving(false);
+          return;
+        }
       }
 
       onSave();
@@ -249,7 +260,7 @@ function ClientModal({
                   />
                 ))}
               </div>
-              
+
               <div className="mt-4 pt-3 border-t">
                 <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Exoneraciones</p>
                 <div className="grid grid-cols-2 gap-2 mb-3">

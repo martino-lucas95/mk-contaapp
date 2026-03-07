@@ -65,11 +65,11 @@ const ROLE_LABEL: Record<UserRole, string> = {
   cliente: 'Cliente',
 };
 
-const linkClass = ({ isActive }: { isActive: boolean }) =>
+const linkClass = (isActive: boolean) =>
   cn(
-    'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200',
+    'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-primary',
     isActive
-      ? 'bg-sidebar-accent text-sidebar-foreground shadow-sm'
+      ? 'bg-primary/10 text-primary shadow-sm'
       : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
   );
 
@@ -181,7 +181,7 @@ function MobileDrawer({
               to={item.to}
               end={item.exact}
               onClick={onClose}
-              className={linkClass}
+              className={({ isActive }) => linkClass(isActive)}
             >
               {item.icon}
               <span>{item.label}</span>
@@ -304,9 +304,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               to={item.to}
               end={item.exact}
               title={collapsed ? item.label : undefined}
-              className={cn(
-                linkClass,
-                collapsed && 'justify-center px-2'
+              className={({ isActive }) => cn(
+                linkClass(isActive),
+                collapsed && 'justify-center px-0'
               )}
             >
               {item.icon}

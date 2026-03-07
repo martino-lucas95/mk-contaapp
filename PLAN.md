@@ -1,6 +1,6 @@
 # ContaApp — Plan de Desarrollo
 
-> Última actualización: 2026-03-07 · v1.0.9 en producción
+> Última actualización: 2026-03-07 · v1.1.0 en producción
 
 ---
 
@@ -34,7 +34,7 @@
 
 ---
 
-## Cambios aplicados en v1.0.9
+## Cambios aplicados en v1.1.0
 
 ### Fix theming `ClientDetailPage`
 - `CredField` y `HonField` ya no usan colores hardcodeados (`#6D28D9`, `#2563eb`)
@@ -75,8 +75,8 @@ Todos los cambios usan el hook reactivo `useIsMobile(768)` — responde a resize
 
 ### Próximos pasos (orden validado)
 
-1. ✅ ~~Fix theming `ClientDetailPage`~~ — hecho en v1.0.9
-2. ✅ ~~Responsive mobile — tablas → cards~~ — hecho en v1.0.9
+1. ✅ ~~Fix theming `ClientDetailPage`~~ — hecho en v1.1.0
+2. ✅ ~~Responsive mobile — tablas → cards~~ — hecho en v1.1.0
 3. Validar portal del cliente con cuenta `cliente`
 4. **Exportación PDF/Excel** — empezar por honorarios del cliente
 5. Boletos automáticos desde vencimientos
@@ -90,6 +90,6 @@ Todos los cambios usan el hook reactivo `useIsMobile(768)` — responde a resize
 - **URL producción**: https://contapp.mkstudios.net
 - **Backend entity**: `nombre` y `apellido` son `NOT NULL` — siempre aplicar fallback en frontend
 - **Logs**: `sudo kubectl logs deployment/contaapp-backend -n contaapp --tail=50`
-- **Versiones**: `versions.env` — actualmente `1.0.9`
+- **Versiones**: `versions.env` — actualmente `1.1.0`
 - **PWA**: VitePWA genera `manifest.webmanifest` automáticamente en build
 - **Token GitHub**: ⚠️ revocar en github.com → Settings → Developer settings → Personal access tokens

@@ -16,7 +16,9 @@
     "test:cov": "jest --coverage",
     "typeorm": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli",
     "seed": "node dist/database/seed.js",
-    "seed:dev": "ts-node src/database/seed.ts"
+    "seed:dev": "ts-node src/database/seed.ts",
+    "sync": "node dist/database/sync.js",
+    "sync:dev": "ts-node src/database/sync.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",

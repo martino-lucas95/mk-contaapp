@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: docker.io/library/contaapp-frontend:1.0.9
+          image: docker.io/library/contaapp-frontend:1.1.0
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80

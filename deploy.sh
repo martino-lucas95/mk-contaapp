@@ -12,8 +12,8 @@ PROJECT_ROOT="$SCRIPT_DIR"
 if [ -f "$SCRIPT_DIR/versions.env" ]; then
     source "$SCRIPT_DIR/versions.env"
 else
-    echo "BACKEND_VERSION=1.0.9"  > "$SCRIPT_DIR/versions.env"
-    echo "FRONTEND_VERSION=1.0.9" >> "$SCRIPT_DIR/versions.env"
+    echo "BACKEND_VERSION=1.1.0"  > "$SCRIPT_DIR/versions.env"
+    echo "FRONTEND_VERSION=1.1.0" >> "$SCRIPT_DIR/versions.env"
     source "$SCRIPT_DIR/versions.env"
 fi
 
@@ -161,8 +161,9 @@ show_help() {
     echo "  build     Construye imágenes Docker e importa a k3s"
     echo "  deploy    Aplica los manifests k8s"
     echo "  all       Build + crear DB + deploy (primer deploy)"
-    echo "  seed       Ejecuta seed completo (admin + contador + clientes demo)
-  seed:admin Crea solo el usuario admin"
+    echo "  sync-db   Sincroniza el esquema de la base de datos con las entidades"
+    echo "  seed       Ejecuta seed completo (admin + contador + clientes demo)"
+    echo "  seed:admin Crea solo el usuario admin"
     echo "  update    Actualiza imagen con la versión de versions.env"
     echo "  argocd    Registra la app en ArgoCD (GitOps automático)"
     echo "  status    Muestra pods, services, ingress"
@@ -176,7 +177,7 @@ show_help() {
     echo "  3. ./deploy.sh seed        # crea todos los usuarios demo"
     echo ""
     echo "Actualización:"
-    echo "  1. Editar versions.env  (ej: BACKEND_VERSION=1.0.9)"
+    echo "  1. Editar versions.env  (ej: BACKEND_VERSION=1.1.0)"
     echo "  2. ./deploy.sh build"
     echo "  3. ./deploy.sh update"
     echo ""
@@ -192,6 +193,11 @@ case "${1:-help}" in
     seed:admin) run_seed admin   ;;
     update)  update_image        ;;
     argocd)  setup_argocd        ;;
+    "sync-db")
+        echo "[INFO] Sincronizando esquema de base de datos..."
+        sudo kubectl exec deployment/contaapp-backend -n contaapp -- npm run sync
+        [ $? -eq 0 ] && echo "[OK] Esquema sincronizado." || echo "[ERROR] Falló la sincronización."
+        ;;
     status)  show_status         ;;
     logs)    show_logs "$@"      ;;
     restart) restart_deployment  ;;
