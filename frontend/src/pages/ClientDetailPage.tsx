@@ -37,12 +37,13 @@ const TabBtn = ({ label, active, onClick, count, theme }: { label: string; activ
   <button
     onClick={onClick}
     style={{
-      padding: '9px 18px', borderRadius: '8px 8px 0 0', border: 'none',
+      padding: '9px 14px', borderRadius: '8px 8px 0 0', border: 'none',
       background: active ? theme.cardBg : 'transparent',
       borderBottom: active ? `2px solid ${theme.accent}` : '2px solid transparent',
       color: active ? theme.accentText : theme.textMuted,
-      fontWeight: active ? 600 : 400, fontSize: 14, cursor: 'pointer',
-      display: 'flex', alignItems: 'center', gap: 6,
+      fontWeight: active ? 600 : 400, fontSize: 13, cursor: 'pointer',
+      display: 'flex', alignItems: 'center', gap: 5,
+      flexShrink: 0, whiteSpace: 'nowrap' as const,
     }}
   >
     {label}
@@ -66,10 +67,21 @@ const InfoRow = ({ label, value, theme }: { label: string; value?: string | null
   ) : null;
 
 // ── Main ───────────────────────────────────────────────────────────────────────
+function useIsMobile(breakpoint = 768) {
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < breakpoint);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < breakpoint);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, [breakpoint]);
+  return isMobile;
+}
+
 export default function ClientDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { theme } = useThemeStore();
+  const isMobile = useIsMobile();
 
   const [client, setClient] = useState<Client | null>(null);
   const [vencimientos, setVencimientos] = useState<Vencimiento[]>([]);
@@ -321,7 +333,7 @@ export default function ClientDetailPage() {
   const vencProximos = vencimientos.filter(v => v.estado === 'pendiente' || v.estado === 'alertado').length;
 
   return (
-    <div style={{ padding: '28px 32px', maxWidth: 960, background: theme.mainBg, minHeight: '100%' }}>
+    <div style={{ padding: isMobile ? '16px' : '28px 32px', maxWidth: 960, background: theme.mainBg, minHeight: '100%' }}>
 
       {/* Breadcrumb */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20, fontSize: 13, color: theme.textMuted }}>
@@ -358,8 +370,8 @@ export default function ClientDetailPage() {
         </span>
       </div>
 
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: 2, borderBottom: `1px solid ${theme.cardBorder}`, marginBottom: 24 }}>
+      {/* Tabs — scroll horizontal en mobile */}
+      <div style={{ display: 'flex', gap: 2, borderBottom: `1px solid ${theme.cardBorder}`, marginBottom: 20, overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' as any }}>
         <TabBtn theme={theme} label="Información" active={tab === 'info'} onClick={() => setTab('info')} />
         <TabBtn theme={theme} label="Vencimientos" active={tab === 'vencimientos'} onClick={() => setTab('vencimientos')} count={vencProximos || undefined} />
         <TabBtn theme={theme} label="Credenciales" active={tab === 'credenciales'} onClick={() => setTab('credenciales')} count={credentials.length || undefined} />
@@ -952,15 +964,16 @@ export default function ClientDetailPage() {
   );
 }
 
-// ── Small field component ──────────────────────────────────────────────────────
+// ── Small field components (usan theme del store via prop o fallback neutral) ──
 function CredField({ label, value, onChange, type = 'text', theme }: { label: string; value: string; onChange: (v: string) => void; type?: string; theme?: any }) {
-  const t = theme ?? { textSecondary: '#374151', inputBorder: '#D1D5DB', inputBg: '#fff', textPrimary: '#0F172A', inputBorderFocus: '#6D28D9' };
+  const { theme: storeTheme } = useThemeStore();
+  const t = theme ?? storeTheme;
   return (
     <div>
       <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: t.textSecondary, marginBottom: 5 }}>{label}</label>
       <input type={type} value={value} onChange={e => onChange(e.target.value)}
         style={{ width: '100%', padding: '8px 11px', borderRadius: 7, border: `1px solid ${t.inputBorder}`, fontSize: 14, color: t.textPrimary, background: t.inputBg, outline: 'none', boxSizing: 'border-box' as const }}
-        onFocus={e => (e.target.style.borderColor = t.inputBorderFocus)}
+        onFocus={e => (e.target.style.borderColor = t.accent)}
         onBlur={e => (e.target.style.borderColor = t.inputBorder)} />
     </div>
   );
@@ -970,7 +983,8 @@ function HonField({ label, value, onChange, type = 'text', required, placeholder
   label: string; value: string; onChange: (v: string) => void;
   type?: string; required?: boolean; placeholder?: string; theme?: any;
 }) {
-  const t = theme ?? { textSecondary: '#374151', inputBorder: '#D1D5DB', inputBg: '#fff', textPrimary: '#0F172A', inputBorderFocus: '#2563eb' };
+  const { theme: storeTheme } = useThemeStore();
+  const t = theme ?? storeTheme;
   return (
     <div>
       <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: t.textSecondary, marginBottom: 5 }}>
@@ -979,7 +993,7 @@ function HonField({ label, value, onChange, type = 'text', required, placeholder
       <input type={type} value={value} onChange={e => onChange(e.target.value)}
         required={required} placeholder={placeholder}
         style={{ width: '100%', padding: '8px 11px', borderRadius: 7, border: `1px solid ${t.inputBorder}`, fontSize: 14, color: t.textPrimary, background: t.inputBg, outline: 'none', boxSizing: 'border-box' as const }}
-        onFocus={e => (e.target.style.borderColor = t.inputBorderFocus)}
+        onFocus={e => (e.target.style.borderColor = t.accent)}
         onBlur={e => (e.target.style.borderColor = t.inputBorder)} />
     </div>
   );

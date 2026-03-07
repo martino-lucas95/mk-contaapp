@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './store/auth.store';
 import Layout from './components/Layout';
+import { ThemeSync } from './components/ThemeSync';
 
 // Páginas admin
 import AdminDashboard  from './pages/admin/AdminDashboard';
@@ -46,7 +47,9 @@ function RootRedirect() {
 // ── App ───────────────────────────────────────────────────────────────────────
 export default function App() {
   return (
-    <BrowserRouter>
+    <>
+      <ThemeSync />
+      <BrowserRouter>
       <Routes>
         {/* Público */}
         <Route path="/login" element={<LoginPage />} />
@@ -118,5 +121,6 @@ export default function App() {
         <Route path="*" element={<RootRedirect />} />
       </Routes>
     </BrowserRouter>
+    </>
   );
 }

@@ -1,8 +1,50 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { clientsApi } from '../services/api';
-import { useThemeStore } from '../store/theme.store';
-import { Client, TipoEmpresa, EstadoCliente, PerfilTributario } from '../types';
+import { clientsApi } from '@/services/api';
+import { Client, TipoEmpresa, EstadoCliente, PerfilTributario } from '@/types';
+import { PageHeader } from '@/components/PageHeader';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Card } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { cn } from '@/lib/utils';
+import { Plus, Search, Pencil, UserX } from 'lucide-react';
+
+// ── Hook responsive ──────────────────────────────────────────────────────────
+function useIsMobile(breakpoint = 768) {
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < breakpoint);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < breakpoint);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, [breakpoint]);
+  return isMobile;
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const TIPO_EMPRESA_LABEL: Record<TipoEmpresa, string> = {
@@ -41,94 +83,61 @@ const EMPTY_FORM = {
 type FormData = typeof EMPTY_FORM;
 
 // ── Sub-components ────────────────────────────────────────────────────────────
-const Badge = ({ estado }: { estado: EstadoCliente }) => {
+function EstadoBadge({ estado }: { estado: EstadoCliente }) {
   const c = ESTADO_COLORS[estado];
   return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: 5,
-      padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 500,
-      background: c.bg, color: c.color,
-    }}>
-      <span style={{ width: 6, height: 6, borderRadius: '50%', background: c.dot, display: 'inline-block' }} />
+    <Badge variant="secondary" className="gap-1.5 font-medium" style={{ background: c.bg, color: c.color }}>
+      <span className="size-1.5 rounded-full" style={{ background: c.dot }} />
       {estado.charAt(0).toUpperCase() + estado.slice(1)}
-    </span>
+    </Badge>
   );
-};
+}
 
 const TributoBadge = ({ label }: { label: string }) => (
-  <span style={{
-    display: 'inline-block', padding: '2px 7px', borderRadius: 4,
-    fontSize: 11, fontWeight: 500,
-    background: '#EDE9FE', color: '#6D28D9',
-    marginRight: 4, marginBottom: 2,
-  }}>{label}</span>
+  <Badge variant="outline" className="mr-1 mb-0.5 bg-violet-50 text-violet-700 border-violet-200">
+    {label}
+  </Badge>
 );
 
-const Field = ({
+function Field({
   label, value, onChange, type = 'text', required, placeholder,
 }: {
   label: string; value: string; onChange: (v: string) => void;
   type?: string; required?: boolean; placeholder?: string;
-}) => (
-  <div>
-    <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 5 }}>
-      {label}{required && <span style={{ color: '#DC2626' }}> *</span>}
-    </label>
-    <input
-      type={type} value={value} onChange={e => onChange(e.target.value)}
-      required={required} placeholder={placeholder}
-      style={{
-        width: '100%', padding: '8px 11px', borderRadius: 7,
-        border: '1px solid #D1D5DB', fontSize: 14, color: '#0F172A',
-        outline: 'none', boxSizing: 'border-box', background: '#fff',
-      }}
-      onFocus={e => (e.target.style.borderColor = '#6D28D9')}
-      onBlur={e => (e.target.style.borderColor = '#D1D5DB')}
-    />
-  </div>
-);
+}) {
+  const id = `field-${label.replace(/\s/g, '-')}`;
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id} className="text-sm font-medium">
+        {label}{required && <span className="text-destructive"> *</span>}
+      </Label>
+      <Input id={id} type={type} value={value} onChange={e => onChange(e.target.value)} required={required} placeholder={placeholder} />
+    </div>
+  );
+}
 
-const CheckField = ({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) => (
-  <label style={{
-    display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer',
-    padding: '6px 10px', borderRadius: 7, userSelect: 'none',
-    background: checked ? '#EDE9FE' : '#F8FAFC',
-    border: `1px solid ${checked ? '#C4B5FD' : '#E2E8F0'}`,
-    transition: 'all 0.15s',
-  }}>
-    <input
-      type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)}
-      style={{ display: 'none' }}
-    />
-    <span style={{
-      width: 16, height: 16, borderRadius: 4, flexShrink: 0, display: 'flex',
-      alignItems: 'center', justifyContent: 'center',
-      background: checked ? '#6D28D9' : '#fff',
-      border: `2px solid ${checked ? '#6D28D9' : '#D1D5DB'}`,
-    }}>
-      {checked && (
-        <svg width="10" height="10" fill="none" stroke="#fff" strokeWidth="2.5" viewBox="0 0 24 24">
-          <polyline points="20 6 9 17 4 12" />
-        </svg>
+function CheckField({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <div
+      className={cn(
+        'flex items-center gap-2 rounded-lg border p-3 cursor-pointer transition-colors',
+        checked ? 'border-primary/50 bg-primary/5' : 'border-border'
       )}
-    </span>
-    <span style={{ fontSize: 13, fontWeight: 500, color: checked ? '#6D28D9' : '#475569' }}>{label}</span>
-  </label>
-);
+      onClick={() => onChange(!checked)}
+    >
+      <Checkbox checked={checked} onCheckedChange={(v) => onChange(!!v)} />
+      <Label className="cursor-pointer text-sm font-medium">{label}</Label>
+    </div>
+  );
+}
 
-// ── Sección del formulario ────────────────────────────────────────────────────
 function FormSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div style={{ marginBottom: 24 }}>
-      <div style={{
-        fontSize: 11, fontWeight: 700, color: '#94A3B8',
-        textTransform: 'uppercase', letterSpacing: '0.07em',
-        marginBottom: 12, paddingBottom: 8,
-        borderBottom: '1px solid #F1F5F9',
-      }}>{title}</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {children}
+    <div className="mb-6">
+      <div className="mb-3 border-b pb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+        {title}
       </div>
+      <div className="flex flex-col gap-3">{children}</div>
     </div>
   );
 }
@@ -146,7 +155,7 @@ function ClientModal({
   const [form, setForm] = useState<FormData>(initial ?? EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const isMobile = window.innerWidth < 768;
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     if (open) { setForm(initial ?? EMPTY_FORM); setError(''); }
@@ -162,8 +171,8 @@ function ClientModal({
       const payload = {
         ...form,
         tipoEmpresa: form.tipoEmpresa || undefined,
-        nombre: form.nombre.trim() || form.razonSocial.trim() || 'Sin nombre',
-        apellido: form.apellido.trim() || '-',
+        nombre: (form.nombre ?? '').trim() || (form.razonSocial ?? '').trim() || 'Sin nombre',
+        apellido: (form.apellido ?? '').trim() || '-',
       };
       if (editId) {
         await clientsApi.update(editId, payload);
@@ -179,82 +188,47 @@ function ClientModal({
     }
   };
 
-  if (!open) return null;
-
   return (
-    <div
-      style={{
-        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
-        display: 'flex',
-        alignItems: isMobile ? 'flex-end' : 'center',
-        justifyContent: 'center', zIndex: 1000,
-      }}
-      onClick={e => e.target === e.currentTarget && onClose()}
-    >
-      <div style={{
-        background: '#fff',
-        borderRadius: isMobile ? '20px 20px 0 0' : 16,
-        width: isMobile ? '100%' : 540,
-        maxHeight: isMobile ? '92vh' : '88vh',
-        display: 'flex', flexDirection: 'column',
-        boxShadow: '0 24px 48px rgba(0,0,0,0.18)',
-      }}>
-        {/* Header */}
-        <div style={{
-          padding: '20px 20px 16px',
-          borderBottom: '1px solid #F1F5F9',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          flexShrink: 0,
-        }}>
-          <h2 style={{ fontSize: 17, fontWeight: 700, color: '#0F172A' }}>
-            {editId ? 'Editar cliente' : 'Nuevo cliente'}
-          </h2>
-          <button onClick={onClose} style={{
-            background: 'none', border: 'none', cursor: 'pointer',
-            color: '#94A3B8', display: 'flex', padding: 4,
-          }}>
-            <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
-          </button>
-        </div>
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className={cn('max-h-[88vh] flex flex-col p-0 gap-0', isMobile && 'max-h-[92vh] rounded-t-2xl')}>
+        <DialogHeader className="shrink-0 border-b px-5 py-4">
+          <DialogTitle>{editId ? 'Editar cliente' : 'Nuevo cliente'}</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="flex flex-1 flex-col overflow-hidden">
+          <div className="overflow-y-auto px-5 py-4">
 
-        {/* Body — todo en una sola pantalla con scroll */}
-        <form onSubmit={handleSubmit} style={{ overflow: 'auto', flex: 1 }}>
-          <div style={{ padding: '20px 20px 0' }}>
-
-            {/* ── Empresa ── */}
             <FormSection title="🏢 Empresa">
-              <Field label="Razón Social" value={form.razonSocial} onChange={set('razonSocial')} placeholder="Ej: MK Studios SAS" />
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <Field label="Razón Social" value={form.razonSocial} onChange={set('razonSocial')} placeholder="Ej: Empresa SAS" />
+              <div className="grid grid-cols-2 gap-3">
                 <Field label="RUT" value={form.rut} onChange={set('rut')} placeholder="210000000010" />
-                <div>
-                  <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 5 }}>Tipo</label>
-                  <select
-                    value={form.tipoEmpresa}
-                    onChange={e => setForm(f => ({ ...f, tipoEmpresa: e.target.value as TipoEmpresa | '' }))}
-                    style={{ width: '100%', padding: '9px 11px', borderRadius: 7, border: '1px solid #D1D5DB', fontSize: 14, color: '#0F172A', background: '#fff', boxSizing: 'border-box' as const }}
-                  >
-                    <option value="">Sin especificar</option>
-                    {Object.entries(TIPO_EMPRESA_LABEL).map(([k, v]) => (
-                      <option key={k} value={k}>{v}</option>
-                    ))}
-                  </select>
+                <div className="space-y-2">
+                  <Label>Tipo</Label>
+                  <Select value={form.tipoEmpresa || 'none'} onValueChange={(v) => setForm(f => ({ ...f, tipoEmpresa: v === 'none' ? '' : (v as TipoEmpresa) }))}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sin especificar" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sin especificar</SelectItem>
+                      {Object.entries(TIPO_EMPRESA_LABEL).map(([k, v]) => (
+                        <SelectItem key={k} value={k}>{v}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div className="grid grid-cols-2 gap-3">
                 <Field label="Giro / Actividad" value={form.giro} onChange={set('giro')} placeholder="Ej: Informática" />
                 <Field label="Inicio actividades" type="date" value={form.fechaInicioActividades} onChange={set('fechaInicioActividades')} />
               </div>
-              <Field label="Dirección" value={form.direccion} onChange={set('direccion')} placeholder="Ej: Rambla República de Chile 4551" />
+              <Field label="Dirección" value={form.direccion} onChange={set('direccion')} placeholder="Ej: Calle 123, Ciudad, País" />
             </FormSection>
 
             {/* ── Obligaciones tributarias ── */}
             <FormSection title="📋 Obligaciones tributarias">
-              <p style={{ fontSize: 12, color: '#64748B', marginTop: -6 }}>
+              <p className="-mt-1.5 text-xs text-muted-foreground">
                 Determinan los vencimientos que se generan automáticamente.
               </p>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <div className="grid grid-cols-2 gap-2">
                 {TRIBUTOS_LABELS.map(({ key, label }) => (
                   <CheckField
                     key={key} label={label}
@@ -265,69 +239,42 @@ function ClientModal({
               </div>
             </FormSection>
 
-            {/* ── Datos personales (colapsable, secundario) ── */}
             <FormSection title="👤 Datos personales (opcional)">
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div className="grid grid-cols-2 gap-3">
                 <Field label="Nombre" value={form.nombre} onChange={set('nombre')} placeholder="Ej: Lucas" />
                 <Field label="Apellido" value={form.apellido} onChange={set('apellido')} placeholder="Ej: Martino" />
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div className="grid grid-cols-2 gap-3">
                 <Field label="CI" value={form.ci} onChange={set('ci')} placeholder="12345678" />
                 <Field label="Teléfono" value={form.telefono} onChange={set('telefono')} placeholder="098 000 000" />
               </div>
               <Field label="Email" type="email" value={form.email} onChange={set('email')} />
-              <div>
-                <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 5 }}>Notas</label>
-                <textarea
-                  value={form.notas} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))}
-                  rows={2} placeholder="Observaciones adicionales..."
-                  style={{ width: '100%', padding: '8px 11px', borderRadius: 7, border: '1px solid #D1D5DB', fontSize: 14, color: '#0F172A', outline: 'none', boxSizing: 'border-box' as const, resize: 'vertical', fontFamily: 'inherit' }}
-                  onFocus={e => (e.target.style.borderColor = '#6D28D9')}
-                  onBlur={e => (e.target.style.borderColor = '#D1D5DB')}
-                />
+              <div className="space-y-2">
+                <Label>Notas</Label>
+                <Textarea value={form.notas} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))} rows={2} placeholder="Observaciones adicionales..." />
               </div>
             </FormSection>
 
           </div>
 
           {error && (
-            <div style={{ margin: '0 20px', background: '#FEE2E2', color: '#DC2626', borderRadius: 7, padding: '8px 12px', fontSize: 13 }}>
-              {error}
-            </div>
+            <div className="mx-5 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</div>
           )}
 
-          {/* Footer */}
-          <div style={{
-            padding: '14px 20px',
-            paddingBottom: isMobile ? 'calc(14px + env(safe-area-inset-bottom))' : '20px',
-            display: 'flex', gap: 10, justifyContent: 'flex-end',
-            borderTop: '1px solid #F1F5F9', flexShrink: 0,
-            position: 'sticky', bottom: 0, background: '#fff',
-          }}>
-            <button type="button" onClick={onClose} style={{
-              flex: isMobile ? 1 : undefined,
-              padding: '10px 20px', borderRadius: 8, border: '1px solid #E2E8F0',
-              background: '#fff', color: '#475569', fontSize: 14, cursor: 'pointer',
-            }}>Cancelar</button>
-            <button type="submit" disabled={saving} style={{
-              flex: isMobile ? 2 : undefined,
-              padding: '10px 22px', borderRadius: 8, border: 'none',
-              background: '#6D28D9', color: '#fff', fontSize: 14, fontWeight: 500,
-              cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1,
-            }}>
-              {saving ? 'Guardando...' : editId ? 'Guardar cambios' : 'Crear cliente'}
-            </button>
-          </div>
+          <DialogFooter className="shrink-0 border-t px-5 py-4">
+            <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
+            <Button type="submit" disabled={saving}>{saving ? 'Guardando...' : editId ? 'Guardar cambios' : 'Crear cliente'}</Button>
+          </DialogFooter>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function ClientsPage() {
   const navigate = useNavigate();
-  const { theme } = useThemeStore();
+  const isMobile = useIsMobile();
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -383,187 +330,137 @@ export default function ClientsPage() {
   });
 
   return (
-    <div style={{ padding: '28px 32px' }}>
+    <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-8">
+      <PageHeader
+        title="Clientes"
+        description={loading ? 'Cargando...' : `${clients.length} cliente${clients.length !== 1 ? 's' : ''} registrado${clients.length !== 1 ? 's' : ''}`}
+        actions={
+          <Button onClick={() => { setEditClient(null); setModalOpen(true); }}>
+            <Plus className="size-4" />
+            {isMobile ? 'Nuevo' : 'Nuevo cliente'}
+          </Button>
+        }
+      />
 
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
-        <div>
-          <h1 style={{ fontSize: 22, fontWeight: 700, color: theme.textPrimary, marginBottom: 4 }}>Clientes</h1>
-          <p style={{ color: theme.textSecondary, fontSize: 14 }}>
-            {loading ? 'Cargando...' : `${clients.length} cliente${clients.length !== 1 ? 's' : ''} registrado${clients.length !== 1 ? 's' : ''}`}
-          </p>
-        </div>
-        <button
-          onClick={() => { setEditClient(null); setModalOpen(true); }}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            padding: '9px 18px', borderRadius: 8,
-            background: '#6D28D9', color: '#fff', border: 'none',
-            fontSize: 14, fontWeight: 500, cursor: 'pointer',
-          }}
-        >
-          <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-          Nuevo cliente
-        </button>
-      </div>
-
-      {/* Buscador */}
-      <div style={{ position: 'relative', marginBottom: 20, maxWidth: 380 }}>
-        <svg style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }}
-          width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-          <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-        </svg>
-        <input
-          type="text" placeholder="Buscar por nombre, RUT, email..."
-          value={search} onChange={e => setSearch(e.target.value)}
-          style={{
-            width: '100%', padding: '9px 12px 9px 36px',
-            borderRadius: 8, border: '1px solid #E2E8F0',
-            fontSize: 14, color: '#0F172A', outline: 'none', boxSizing: 'border-box',
-            background: '#fff',
-          }}
-          onFocus={e => (e.target.style.borderColor = '#6D28D9')}
-          onBlur={e => (e.target.style.borderColor = '#E2E8F0')}
+      <div className="relative mb-4 max-w-md">
+        <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          type="text"
+          placeholder="Buscar por nombre, RUT, email..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="pl-9"
         />
       </div>
 
-      {/* Tabla */}
-      <div style={{ background: theme.cardBg, borderRadius: 12, boxShadow: theme.cardShadow, overflow: 'hidden', border: `1px solid ${theme.cardBorder}` }}>
-        {loading ? (
-          <div style={{ padding: 48, textAlign: 'center', color: theme.textMuted, fontSize: 14 }}>Cargando clientes...</div>
-        ) : filtered.length === 0 ? (
-          <div style={{ padding: 56, textAlign: 'center' }}>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>👥</div>
-            <div style={{ color: '#64748B', fontSize: 14, fontWeight: 500 }}>
-              {search ? 'No se encontraron resultados' : 'No hay clientes registrados'}
-            </div>
-            <div style={{ color: '#94A3B8', fontSize: 13, marginTop: 4 }}>
-              {search ? 'Probá con otro término de búsqueda' : 'Creá el primero con el botón de arriba'}
-            </div>
+      {loading ? (
+        <div className="py-12 text-center text-sm text-muted-foreground">Cargando clientes...</div>
+      ) : filtered.length === 0 ? (
+        <Card className="py-12 text-center">
+          <div className="mb-3 text-4xl">👥</div>
+          <div className="font-medium text-foreground">
+            {search ? 'No se encontraron resultados' : 'No hay clientes registrados'}
           </div>
-        ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ background: theme.tableHeaderBg, borderBottom: `1px solid ${theme.cardBorder}` }}>
+          <div className="mt-1 text-sm text-muted-foreground">
+            {search ? 'Probá con otro término de búsqueda' : 'Creá el primero con el botón de arriba'}
+          </div>
+        </Card>
+      ) : isMobile ? (
+        <div className="flex flex-col gap-3">
+          {filtered.map(c => {
+            const tributos = TRIBUTOS_LABELS.filter(t => c[t.key]);
+            return (
+              <Card key={c.id} className="cursor-pointer p-4" onClick={() => navigate(`/clients/${c.id}`)}>
+                <div className="flex gap-3">
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 font-bold text-primary text-sm">
+                    {c.nombre[0]}{c.apellido[0]}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="truncate font-semibold">{c.nombre} {c.apellido}</div>
+                      <EstadoBadge estado={c.estado} />
+                    </div>
+                    {c.razonSocial && <div className="mt-0.5 text-sm text-muted-foreground">{c.razonSocial}</div>}
+                    {c.rut && <div className="mt-1 font-mono text-xs text-muted-foreground">RUT: {c.rut}</div>}
+                    {tributos.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1">{tributos.map(t => <TributoBadge key={t.key} label={t.label} />)}</div>
+                    )}
+                    <div className="mt-2 flex gap-2" onClick={e => e.stopPropagation()}>
+                      <Button variant="outline" size="sm" onClick={() => handleEdit(c)}>Editar</Button>
+                      {c.estado === 'activo' && (
+                        <Button variant="outline" size="sm" className="border-red-200 text-red-600 hover:bg-red-50" onClick={() => setConfirmDeactivate(c)}>
+                          <UserX className="size-3" /> Desactivar
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      ) : (
+        <Card>
+          <Table>
+            <TableHeader>
+              <TableRow>
                 {['Cliente', 'RUT / Empresa', 'Tributos', 'Estado', 'Acciones'].map(h => (
-                  <th key={h} style={{
-                    padding: '12px 16px', textAlign: 'left',
-                    fontSize: 12, fontWeight: 600, color: theme.textMuted,
-                    textTransform: 'uppercase', letterSpacing: '0.05em',
-                  }}>{h}</th>
+                  <TableHead key={h}>{h}</TableHead>
                 ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((c, i) => {
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.map((c) => {
                 const tributos = TRIBUTOS_LABELS.filter(t => c[t.key]);
                 return (
-                  <tr
-                    key={c.id}
-                    style={{
-                      borderBottom: i < filtered.length - 1 ? `1px solid ${theme.tableBorder}` : 'none',
-                      cursor: 'pointer', transition: 'background 0.1s',
-                    }}
-                    onMouseEnter={e => (e.currentTarget.style.background = theme.tableRowHover)}
-                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                    onClick={() => navigate(`/clients/${c.id}`)}
-                  >
-                    {/* Nombre */}
-                    <td style={{ padding: '14px 16px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <div style={{
-                          width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
-                          background: theme.accentLight, color: theme.accentText,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: 12, fontWeight: 700,
-                        }}>
+                  <TableRow key={c.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/clients/${c.id}`)}>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 font-bold text-primary text-xs">
                           {c.nombre[0]}{c.apellido[0]}
                         </div>
                         <div>
-                          <div style={{ fontSize: 14, fontWeight: 600, color: theme.textPrimary }}>
-                            {c.nombre} {c.apellido}
-                          </div>
-                          {c.email && (
-                            <div style={{ fontSize: 12, color: theme.textMuted }}>{c.email}</div>
-                          )}
+                          <div className="font-semibold">{c.nombre} {c.apellido}</div>
+                          {c.email && <div className="text-xs text-muted-foreground">{c.email}</div>}
                         </div>
                       </div>
-                    </td>
-
-                    {/* RUT / Empresa */}
-                    <td style={{ padding: '14px 16px' }}>
+                    </TableCell>
+                    <TableCell>
                       {c.rut ? (
                         <>
-                          <div style={{ fontSize: 13, fontWeight: 500, color: '#0F172A' }}>{c.rut}</div>
-                          {c.tipoEmpresa && (
-                            <div style={{ fontSize: 12, color: '#94A3B8' }}>{TIPO_EMPRESA_LABEL[c.tipoEmpresa]}</div>
-                          )}
+                          <div className="font-medium">{c.rut}</div>
+                          {c.tipoEmpresa && <div className="text-xs text-muted-foreground">{TIPO_EMPRESA_LABEL[c.tipoEmpresa]}</div>}
                         </>
-                      ) : (
-                        <span style={{ fontSize: 13, color: '#CBD5E1' }}>—</span>
-                      )}
-                    </td>
-
-                    {/* Tributos */}
-                    <td style={{ padding: '14px 16px', maxWidth: 200 }}>
+                      ) : <span className="text-muted-foreground">—</span>}
+                    </TableCell>
+                    <TableCell className="max-w-[200px]">
                       {tributos.length > 0 ? (
-                        <div style={{ lineHeight: 1.8 }}>
+                        <div className="space-y-1">
                           {tributos.slice(0, 4).map(t => <TributoBadge key={t.key} label={t.label} />)}
-                          {tributos.length > 4 && (
-                            <span style={{ fontSize: 11, color: '#94A3B8' }}>+{tributos.length - 4} más</span>
-                          )}
+                          {tributos.length > 4 && <span className="text-xs text-muted-foreground">+{tributos.length - 4} más</span>}
                         </div>
-                      ) : (
-                        <span style={{ fontSize: 13, color: '#CBD5E1' }}>Sin configurar</span>
-                      )}
-                    </td>
-
-                    {/* Estado */}
-                    <td style={{ padding: '14px 16px' }}>
-                      <Badge estado={c.estado} />
-                    </td>
-
-                    {/* Acciones */}
-                    <td style={{ padding: '14px 16px' }} onClick={e => e.stopPropagation()}>
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <button
-                          onClick={() => handleEdit(c)}
-                          title="Editar"
-                          style={{
-                            padding: '5px 10px', borderRadius: 6, border: '1px solid #E2E8F0',
-                            background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center',
-                          }}
-                        >
-                          <svg width="14" height="14" fill="none" stroke="#475569" strokeWidth="2" viewBox="0 0 24 24">
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                          </svg>
-                        </button>
+                      ) : <span className="text-muted-foreground">Sin configurar</span>}
+                    </TableCell>
+                    <TableCell><EstadoBadge estado={c.estado} /></TableCell>
+                    <TableCell onClick={e => e.stopPropagation()}>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="icon" onClick={() => handleEdit(c)} title="Editar">
+                          <Pencil className="size-4" />
+                        </Button>
                         {c.estado === 'activo' && (
-                          <button
-                            onClick={() => setConfirmDeactivate(c)}
-                            title="Desactivar"
-                            style={{
-                              padding: '5px 10px', borderRadius: 6, border: '1px solid #FEE2E2',
-                              background: '#FFF5F5', cursor: 'pointer', display: 'flex', alignItems: 'center',
-                            }}
-                          >
-                            <svg width="14" height="14" fill="none" stroke="#DC2626" strokeWidth="2" viewBox="0 0 24 24">
-                              <circle cx="12" cy="12" r="10" /><line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
-                            </svg>
-                          </button>
+                          <Button variant="outline" size="icon" className="border-red-200 text-red-600 hover:bg-red-50" onClick={() => setConfirmDeactivate(c)} title="Desactivar">
+                            <UserX className="size-4" />
+                          </Button>
                         )}
                       </div>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 );
               })}
-            </tbody>
-          </table>
-        )}
-      </div>
+            </TableBody>
+          </Table>
+        </Card>
+      )}
 
       {/* Modal crear/editar */}
       <ClientModal
@@ -574,33 +471,20 @@ export default function ClientsPage() {
         editId={editClient?.id}
       />
 
-      {/* Modal confirmar desactivar */}
-      {confirmDeactivate && (
-        <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
-        }}>
-          <div style={{
-            background: '#fff', borderRadius: 14, padding: '28px',
-            width: 380, boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
-          }}>
-            <h2 style={{ fontSize: 17, fontWeight: 700, color: '#0F172A', marginBottom: 10 }}>¿Desactivar cliente?</h2>
-            <p style={{ color: '#64748B', fontSize: 14, marginBottom: 20 }}>
-              <strong>{confirmDeactivate.nombre} {confirmDeactivate.apellido}</strong> pasará a estado inactivo.
-            </p>
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-              <button onClick={() => setConfirmDeactivate(null)} style={{
-                padding: '8px 18px', borderRadius: 7, border: '1px solid #E2E8F0',
-                background: '#fff', color: '#475569', fontSize: 14, cursor: 'pointer',
-              }}>Cancelar</button>
-              <button onClick={handleDeactivate} style={{
-                padding: '8px 18px', borderRadius: 7, border: 'none',
-                background: '#DC2626', color: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer',
-              }}>Desactivar</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Dialog open={!!confirmDeactivate} onOpenChange={(o) => !o && setConfirmDeactivate(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>¿Desactivar cliente?</DialogTitle>
+          </DialogHeader>
+          <p className="text-muted-foreground">
+            <strong>{confirmDeactivate?.nombre} {confirmDeactivate?.apellido}</strong> pasará a estado inactivo.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmDeactivate(null)}>Cancelar</Button>
+            <Button variant="destructive" onClick={handleDeactivate}>Desactivar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

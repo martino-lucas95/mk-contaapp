@@ -4,6 +4,16 @@ import { clientsApi, credentialsApi } from '../services/api';
 import { useThemeStore } from '../store/theme.store';
 import { Client, Credential, PlataformaCredencial } from '../types';
 
+function useIsMobile(breakpoint = 768) {
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < breakpoint);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < breakpoint);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, [breakpoint]);
+  return isMobile;
+}
+
 const PLATAFORMA_LABEL: Record<PlataformaCredencial, string> = {
   dgi: 'DGI',
   bps: 'BPS',
@@ -28,6 +38,7 @@ type CredConCliente = Credential & { clienteNombre?: string; clienteId?: string 
 
 export default function CredentialsPage() {
   const theme = useThemeStore((s) => s.theme);
+  const isMobile = useIsMobile();
   const [credentials, setCredentials] = useState<CredConCliente[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
@@ -89,18 +100,18 @@ export default function CredentialsPage() {
   });
 
   return (
-    <div style={{ padding: '28px 32px' }}>
+    <div style={{ padding: isMobile ? '16px' : '28px 32px' }}>
       {/* Header */}
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, color: '#0F172A', marginBottom: 4 }}>Credenciales</h1>
-        <p style={{ color: '#64748B', fontSize: 14 }}>
+      <div style={{ marginBottom: 20 }}>
+        <h1 style={{ fontSize: isMobile ? 19 : 22, fontWeight: 700, color: theme.textPrimary, marginBottom: 4 }}>Credenciales</h1>
+        <p style={{ color: theme.textSecondary, fontSize: 14 }}>
           {loading ? 'Cargando...' : `${credentials.length} credencial${credentials.length !== 1 ? 'es' : ''} de ${clients.length} clientes`}
         </p>
       </div>
 
       {/* Filtros */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
-        <div style={{ position: 'relative', flex: 1, minWidth: 220 }}>
+      <div style={{ display: 'flex', gap: 10, marginBottom: 18, flexWrap: 'wrap' as const }}>
+        <div style={{ position: 'relative', flex: 1, minWidth: 180 }}>
           <svg style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }}
             width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
             <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
@@ -110,17 +121,18 @@ export default function CredentialsPage() {
             value={search} onChange={e => setSearch(e.target.value)}
             style={{
               width: '100%', padding: '9px 12px 9px 34px',
-              borderRadius: 8, border: '1px solid #E2E8F0',
-              fontSize: 14, color: '#0F172A', outline: 'none', boxSizing: 'border-box',
+              borderRadius: 8, border: `1px solid ${theme.cardBorder}`,
+              fontSize: 14, color: theme.textPrimary, outline: 'none', boxSizing: 'border-box',
+              background: theme.inputBg,
             }}
-            onFocus={e => (e.target.style.borderColor = '#6D28D9')}
-            onBlur={e => (e.target.style.borderColor = '#E2E8F0')}
+            onFocus={e => (e.target.style.borderColor = theme.accent)}
+            onBlur={e => (e.target.style.borderColor = theme.cardBorder)}
           />
         </div>
         <select
           value={filtroPlataforma}
           onChange={e => setFiltroPlataforma(e.target.value as any)}
-          style={{ padding: '9px 12px', borderRadius: 8, border: '1px solid #E2E8F0', fontSize: 14, background: '#fff', color: '#0F172A' }}
+          style={{ padding: '9px 12px', borderRadius: 8, border: `1px solid ${theme.cardBorder}`, fontSize: 14, background: theme.inputBg, color: theme.textPrimary }}
         >
           <option value="todas">Todas las plataformas</option>
           {Object.entries(PLATAFORMA_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
@@ -154,7 +166,7 @@ export default function CredentialsPage() {
                 </Link>
                 <span style={{ fontSize: 12, color: theme.textMuted }}>{creds.length} credencial{creds.length !== 1 ? 'es' : ''}</span>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
                 {creds.map(cred => {
                   const color = PLATAFORMA_COLOR[cred.plataforma] ?? '#475569';
                   return (
