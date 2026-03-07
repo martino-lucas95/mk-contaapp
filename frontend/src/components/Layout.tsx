@@ -135,10 +135,8 @@ function MobileHeader({ onMenuOpen }: { onMenuOpen: () => void }) {
   return (
     <header className="fixed left-0 right-0 top-0 z-50 flex h-14 items-center justify-between border-b border-sidebar-border/50 bg-sidebar/85 backdrop-blur-xl px-4 pt-[env(safe-area-inset-top)]">
       <div className="flex items-center gap-2">
-        <div className="flex size-7 items-center justify-center rounded-lg bg-primary font-bold text-primary-foreground text-xs shadow-sm">
-          C
-        </div>
-        <span className="font-bold text-sidebar-foreground">ContaApp</span>
+        <img src="/logo.png" alt="Honorix" className="size-8 object-contain" />
+        <span className="font-bold text-sidebar-foreground text-lg tracking-tight">Honorix</span>
       </div>
       <Button variant="ghost" size="icon" onClick={onMenuOpen} className="text-sidebar-foreground hover:bg-sidebar-accent/50">
         <Menu className="size-5" />
@@ -169,10 +167,8 @@ function MobileDrawer({
       <SheetContent side="left" className="w-[280px] border-r bg-sidebar p-0 text-sidebar-foreground">
         <SheetHeader className="flex flex-row items-center justify-between border-b border-sidebar-border p-4">
           <div className="flex items-center gap-2">
-            <div className="flex size-7 items-center justify-center rounded-lg bg-primary font-bold text-primary-foreground text-xs">
-              C
-            </div>
-            <SheetTitle className="font-bold text-sidebar-foreground">ContaApp</SheetTitle>
+            <img src="/logo.png" alt="Honorix" className="size-7 object-contain" />
+            <SheetTitle className="font-bold text-sidebar-foreground text-lg tracking-tight">Honorix</SheetTitle>
           </div>
           <Button variant="ghost" size="icon" onClick={onClose} className="text-sidebar-foreground/70">
             <X className="size-5" />
@@ -286,10 +282,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div className="flex min-h-[60px] items-center justify-between border-b border-sidebar-border px-4">
           {!collapsed && (
             <div className="flex items-center gap-2">
-              <div className="flex size-8 items-center justify-center rounded-lg bg-primary font-bold text-primary-foreground text-sm">
-                C
-              </div>
-              <span className="font-bold tracking-tight text-sidebar-foreground">ContaApp</span>
+              <img src="/logo.png" alt="Honorix" className="size-8 object-contain" />
+              <span className="font-bold tracking-tight text-sidebar-foreground text-lg">Honorix</span>
             </div>
           )}
           <Button

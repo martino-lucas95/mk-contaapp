@@ -25,7 +25,7 @@ async function bootstrap() {
 
   app.enableCors({
     origin: [
-      process.env.FRONTEND_URL   || 'http://localhost:5173',
+      process.env.FRONTEND_URL || 'http://localhost:5173',
       'http://localhost:3001',
     ],
     credentials: true,
@@ -39,7 +39,7 @@ async function bootstrap() {
   const port = process.env.PORT || 3000;
   await app.listen(port);
 
-  console.log(`\n🚀 ContaApp API  →  http://localhost:${port}/api/v1`);
+  console.log(`\n🚀 Honorix API  →  http://localhost:${port}/api/v1`);
   console.log(`📚 Entorno        →  ${process.env.NODE_ENV ?? 'development'}\n`);
 }
 

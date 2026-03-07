@@ -13,7 +13,7 @@ import { User } from '../../modules/users/user.entity';
 import { Passkey } from '../../modules/users/passkey.entity';
 
 // Configuración básica
-const rpName = 'MK ContaApp';
+const rpName = 'Honorix';
 const rpID = 'localhost'; // En producción debería ser el dominio real e.g., 'contapp.mkstudios.net'
 const origin = `http://${rpID}:5173`; // En producción debe coincidir con el puerto o https
 

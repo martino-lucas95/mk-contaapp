@@ -33,9 +33,12 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
       <Card className="w-full max-w-[360px]">
-        <CardHeader className="space-y-1">
-          <h1 className="text-2xl font-bold text-primary">ContaApp</h1>
-          <p className="text-sm text-muted-foreground">Sistema de Gestión Contable</p>
+        <CardHeader className="space-y-4 flex flex-col items-center">
+          <img src="/logo.png" alt="Honorix" className="size-16 object-contain" />
+          <div className="text-center">
+            <h1 className="text-3xl font-bold tracking-tight text-primary">Honorix</h1>
+            <p className="text-sm text-muted-foreground mt-1">Sistema de Gestión Contable</p>
+          </div>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
