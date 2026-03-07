@@ -10,7 +10,8 @@
  */
 
 import { DataSource } from 'typeorm';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
+
 import { User, UserRole } from '../modules/users/user.entity';
 import { Client, TipoEmpresa } from '../modules/clients/client.entity';
 import { Credential, PlataformaCredencial } from '../modules/credentials/credential.entity';

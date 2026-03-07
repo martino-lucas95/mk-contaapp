@@ -1,7 +1,8 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
+
 import { User, UserRole } from './user.entity';
 
 export interface CreateUserDto {
@@ -16,7 +17,7 @@ export interface CreateUserDto {
 export class UsersService {
   constructor(
     @InjectRepository(User) private userRepo: Repository<User>,
-  ) {}
+  ) { }
 
   async findAll(): Promise<Omit<User, 'password'>[]> {
     return this.userRepo.find({ select: ['id', 'nombre', 'apellido', 'email', 'role', 'activo', 'createdAt', 'updatedAt'] });
@@ -68,11 +69,11 @@ export class UsersService {
     const admin = await this.userRepo.findOne({ where: { role: UserRole.ADMIN } });
     if (!admin) {
       await this.create({
-        nombre:   'Admin',
+        nombre: 'Admin',
         apellido: 'ContaApp',
-        email:    'admin@contaapp.uy',
+        email: 'admin@contaapp.uy',
         password: 'admin123',
-        role:     UserRole.ADMIN,
+        role: UserRole.ADMIN,
       });
       console.log('[Seed] Admin creado: admin@contaapp.uy / admin123');
     }

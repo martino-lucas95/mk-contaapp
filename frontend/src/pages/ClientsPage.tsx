@@ -191,7 +191,9 @@ function ClientModal({
             password: form.userPassword
           });
         } catch (userErr: any) {
-          setError(`Cliente guardado, pero error al crear usuario: ${userErr?.response?.data?.message || 'Error desconocido'}`);
+          console.error('[CreateUserError]', userErr);
+          const detail = userErr?.response?.data?.message || userErr?.message || 'Error desconocido';
+          setError(`Cliente guardado, pero error al crear usuario: ${detail}`);
           onSave(); // Refrescar lista igual ya que el cliente se guardó
           // No cerramos el modal para que el usuario proceda o corrija el email/pass
           setSaving(false);

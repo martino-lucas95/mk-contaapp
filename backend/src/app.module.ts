@@ -11,6 +11,8 @@ import { FeesModule } from './modules/fees/fees.module';
 import { MovementsModule } from './modules/movements/movements.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { WebauthnModule } from './auth/webauthn/webauthn.module';
+import { HealthController } from './health.controller';
+
 
 @Module({
   imports: [
@@ -44,5 +46,6 @@ import { WebauthnModule } from './auth/webauthn/webauthn.module';
     NotificationsModule,
     WebauthnModule,
   ],
+  controllers: [HealthController],
 })
 export class AppModule {}
