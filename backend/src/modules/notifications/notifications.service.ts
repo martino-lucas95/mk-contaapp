@@ -1,13 +1,24 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { IsString, IsNotEmpty } from 'class-validator';
 import { Notification, TipoNotificacion } from './notification.entity';
+
+export class CreateNotificationDto {
+  @IsString()
+  @IsNotEmpty()
+  usuarioId: string;
+
+  @IsString()
+  @IsNotEmpty()
+  mensaje: string;
+}
 
 @Injectable()
 export class NotificationsService {
   constructor(
     @InjectRepository(Notification) private notifRepo: Repository<Notification>,
-  ) {}
+  ) { }
 
   async findByUser(usuarioId: string): Promise<Notification[]> {
     return this.notifRepo.find({
@@ -32,6 +43,14 @@ export class NotificationsService {
     return this.notifRepo.save(n);
   }
 
+  async createManual(dto: CreateNotificationDto): Promise<Notification> {
+    return this.create({
+      usuarioId: dto.usuarioId,
+      tipo: TipoNotificacion.SISTEMA,
+      mensaje: dto.mensaje,
+    });
+  }
+
   async markAsRead(id: string): Promise<void> {
     await this.notifRepo.update(id, { leido: true });
   }
@@ -53,9 +72,9 @@ export class NotificationsService {
   ): Promise<void> {
     const urgente = diasRestantes <= 3;
     await this.create({
-      usuarioId:      contadorId,
-      tipo:           TipoNotificacion.VENCIMIENTO_PROXIMO,
-      mensaje:        `${urgente ? '🚨 URGENTE' : '⏰'} ${tipoVenc} de ${clienteNombre} vence en ${diasRestantes} día${diasRestantes !== 1 ? 's' : ''}.`,
+      usuarioId: contadorId,
+      tipo: TipoNotificacion.VENCIMIENTO_PROXIMO,
+      mensaje: `${urgente ? '🚨 URGENTE' : '⏰'} ${tipoVenc} de ${clienteNombre} vence en ${diasRestantes} día${diasRestantes !== 1 ? 's' : ''}.`,
       referenciaTipo: 'vencimiento',
     });
   }
@@ -68,10 +87,10 @@ export class NotificationsService {
     boletoId: string,
   ): Promise<void> {
     await this.create({
-      usuarioId:      contadorId,
-      tipo:           TipoNotificacion.PAGO_CONFIRMADO,
-      mensaje:        `✅ ${clienteNombre} confirmó el pago de ${tipoImpuesto}.`,
-      referenciaId:   boletoId,
+      usuarioId: contadorId,
+      tipo: TipoNotificacion.PAGO_CONFIRMADO,
+      mensaje: `✅ ${clienteNombre} confirmó el pago de ${tipoImpuesto}.`,
+      referenciaId: boletoId,
       referenciaTipo: 'boleto',
     });
   }

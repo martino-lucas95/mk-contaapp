@@ -45,6 +45,12 @@ export class Credential {
   pin: string;
 
   @Column({ type: 'text', nullable: true })
+  url: string;
+
+  @Column({ default: false })
+  mfa: boolean;
+
+  @Column({ type: 'text', nullable: true })
   notas: string;
 
   @Column({ default: true })

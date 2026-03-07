@@ -4,6 +4,7 @@ import {
 } from 'typeorm';
 import { Client } from '../clients/client.entity';
 import { Notification } from '../notifications/notification.entity';
+import { Passkey } from './passkey.entity';
 
 export enum UserRole {
   ADMIN = 'admin',
@@ -44,6 +45,9 @@ export class User {
 
   @OneToMany(() => Notification, (n) => n.usuario)
   notificaciones: Notification[];
+
+  @OneToMany(() => Passkey, (p) => p.user)
+  passkeys: Passkey[];
 
   @CreateDateColumn()
   createdAt: Date;

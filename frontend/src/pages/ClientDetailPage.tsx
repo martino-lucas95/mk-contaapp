@@ -6,10 +6,10 @@ import { Client, Vencimiento, Credential, Honorario, Movimiento, TipoMovimiento,
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const ESTADO_VENC_COLORS: Record<EstadoVencimiento, { bg: string; color: string }> = {
-  pendiente:  { bg: '#FEF3C7', color: '#D97706' },
+  pendiente: { bg: '#FEF3C7', color: '#D97706' },
   completado: { bg: '#DCFCE7', color: '#15803D' },
-  vencido:    { bg: '#FEE2E2', color: '#DC2626' },
-  alertado:   { bg: '#FEF3C7', color: '#D97706' },
+  vencido: { bg: '#FEE2E2', color: '#DC2626' },
+  alertado: { bg: '#FEF3C7', color: '#D97706' },
 };
 
 const PLATAFORMA_LABEL: Record<PlataformaCredencial, string> = {
@@ -19,6 +19,7 @@ const PLATAFORMA_LABEL: Record<PlataformaCredencial, string> = {
   cjppu: 'CJPPU',
   fonasa: 'FONASA',
   banco: 'Banco',
+  'gub.uy': 'Gub.uy',
   otro: 'Otro',
 };
 
@@ -29,6 +30,7 @@ const PLATAFORMA_COLORS: Record<PlataformaCredencial, string> = {
   cjppu: '#92400E',
   fonasa: '#1D4ED8',
   banco: '#374151',
+  'gub.uy': '#0F172A',
   otro: '#475569',
 };
 
@@ -93,12 +95,12 @@ export default function ClientDetailPage() {
 
   // ── Honorarios state ──
   const [showHonModal, setShowHonModal] = useState(false);
-  const [honEditId, setHonEditId]       = useState<string | null>(null);
+  const [honEditId, setHonEditId] = useState<string | null>(null);
   const [showPagoModal, setShowPagoModal] = useState<Honorario | null>(null);
   const [honForm, setHonForm] = useState({ periodo: '', montoAcordado: '', montoCobrado: '0', formaPago: '' as FormaPago | '', notas: '' });
   const [pagoForm, setPagoForm] = useState({ montoCobrado: '', fechaCobro: '', formaPago: 'transferencia' as FormaPago, notas: '' });
   const [savingHon, setSavingHon] = useState(false);
-  const [honError, setHonError]   = useState('');
+  const [honError, setHonError] = useState('');
 
   // movimientos state
   const [showMovModal, setShowMovModal] = useState(false);
@@ -118,6 +120,13 @@ export default function ClientDetailPage() {
   const [credForm, setCredForm] = useState({ plataforma: 'dgi' as PlataformaCredencial, nombrePlataforma: '', usuario: '', password: '', pin: '', notas: '' });
   const [savingCred, setSavingCred] = useState(false);
   const [credError, setCredError] = useState('');
+
+  // auth modal for reveal
+  const { credentialsToken, setCredentialsToken } = useAuthStore();
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authPassword, setAuthPassword] = useState('');
+  const [authError, setAuthError] = useState('');
+  const [pendingRevealId, setPendingRevealId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -139,11 +148,48 @@ export default function ClientDetailPage() {
 
   const handleReveal = async (credId: string) => {
     if (revealed[credId]) { setRevealed(r => { const n = { ...r }; delete n[credId]; return n; }); return; }
+
+    // Check if we have a valid token
+    if (!credentialsToken) {
+      setPendingRevealId(credId);
+      setShowAuthModal(true);
+      return;
+    }
+
+    await performReveal(credId, credentialsToken);
+  };
+
+  const performReveal = async (credId: string, token: string) => {
     setRevealing(credId);
     try {
-      const { data } = await credentialsApi.reveal(credId);
+      const { data } = await credentialsApi.reveal(credId, token);
       setRevealed(r => ({ ...r, [credId]: data.password }));
+    } catch (err: any) {
+      if (err.response?.status === 401) {
+        // Token expired
+        setPendingRevealId(credId);
+        setShowAuthModal(true);
+      } else {
+        alert('Error al visualizar contraseña');
+      }
     } finally { setRevealing(null); }
+  };
+
+  const handleAuthSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError('');
+    try {
+      const { data } = await authApi.getCredentialsToken(authPassword);
+      setCredentialsToken(data.token);
+      setShowAuthModal(false);
+      setAuthPassword('');
+      if (pendingRevealId) {
+        await performReveal(pendingRevealId, data.token);
+        setPendingRevealId(null);
+      }
+    } catch (err: any) {
+      setAuthError('Contraseña incorrecta');
+    }
   };
 
   const handleDeleteCred = async (credId: string) => {
@@ -185,11 +231,11 @@ export default function ClientDetailPage() {
 
   const openEditHon = (h: Honorario) => {
     setHonForm({
-      periodo:       h.periodo,
+      periodo: h.periodo,
       montoAcordado: String(h.montoAcordado),
-      montoCobrado:  String(h.montoCobrado),
-      formaPago:     h.formaPago ?? '',
-      notas:         h.notas ?? '',
+      montoCobrado: String(h.montoCobrado),
+      formaPago: h.formaPago ?? '',
+      notas: h.notas ?? '',
     });
     setHonEditId(h.id);
     setHonError('');
@@ -202,11 +248,11 @@ export default function ClientDetailPage() {
     setSavingHon(true); setHonError('');
     try {
       const payload = {
-        periodo:       honForm.periodo,
+        periodo: honForm.periodo,
         montoAcordado: parseFloat(honForm.montoAcordado),
-        montoCobrado:  parseFloat(honForm.montoCobrado || '0'),
-        formaPago:     honForm.formaPago || undefined,
-        notas:         honForm.notas || undefined,
+        montoCobrado: parseFloat(honForm.montoCobrado || '0'),
+        formaPago: honForm.formaPago || undefined,
+        notas: honForm.notas || undefined,
       };
       if (honEditId) {
         await feesApi.marcarPago(honEditId, payload);
@@ -224,9 +270,9 @@ export default function ClientDetailPage() {
   const openPago = (h: Honorario) => {
     setPagoForm({
       montoCobrado: String(h.montoAcordado),
-      fechaCobro:   new Date().toISOString().slice(0, 10),
-      formaPago:    'transferencia',
-      notas:        '',
+      fechaCobro: new Date().toISOString().slice(0, 10),
+      formaPago: 'transferencia',
+      notas: '',
     });
     setShowPagoModal(h);
   };
@@ -238,9 +284,9 @@ export default function ClientDetailPage() {
     try {
       await feesApi.marcarPago(showPagoModal.id, {
         montoCobrado: parseFloat(pagoForm.montoCobrado),
-        fechaCobro:   pagoForm.fechaCobro,
-        formaPago:    pagoForm.formaPago,
-        notas:        pagoForm.notas || undefined,
+        fechaCobro: pagoForm.fechaCobro,
+        formaPago: pagoForm.formaPago,
+        notas: pagoForm.notas || undefined,
       });
       const { data } = await feesApi.getByClient(id);
       setHonorarios(data);
@@ -393,6 +439,7 @@ export default function ClientDetailPage() {
             <h3 style={{ fontSize: 14, fontWeight: 600, color: theme.textPrimary, marginBottom: 16 }}>🏢 Datos empresa</h3>
             <InfoRow theme={theme} label="Razón social" value={client.razonSocial} />
             <InfoRow theme={theme} label="RUT" value={client.rut} />
+            <InfoRow theme={theme} label="Nro. BPS" value={client.nroBps} />
             <InfoRow theme={theme} label="Tipo empresa" value={client.tipoEmpresa ?? undefined} />
             <InfoRow theme={theme} label="Giro" value={client.giro} />
             <InfoRow theme={theme} label="Inicio actividades" value={client.fechaInicioActividades ? new Date(client.fechaInicioActividades).toLocaleDateString('es-UY') : undefined} />
@@ -420,6 +467,21 @@ export default function ClientDetailPage() {
                 </span>
               ))}
             </div>
+
+            {(client.exoneracionIva || client.exoneracionIrae) && (
+              <div style={{ marginTop: 20, paddingTop: 16, borderTop: `1px solid ${theme.cardBorder}` }}>
+                <h4 style={{ fontSize: 13, fontWeight: 600, color: theme.textPrimary, marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Exoneraciones vigentes</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {client.exoneracionIva && <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#065F46' }}>✓ Exoneración de IVA</div>}
+                  {client.exoneracionIrae && <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#065F46' }}>✓ Exoneración de IRAE</div>}
+                  {client.exoneracionDetalle && (
+                    <div style={{ marginTop: 4, padding: '8px 12px', background: theme.tableHeaderBg, borderRadius: 6, fontSize: 12, color: theme.textSecondary }}>
+                      <strong>Detalle/Resolución:</strong> {client.exoneracionDetalle}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
           {client.notas && (
             <div style={{ background: theme.cardBg, borderRadius: 12, padding: '20px 24px', boxShadow: theme.cardShadow, border: `1px solid ${theme.cardBorder}`, gridColumn: '1 / -1' }}>
@@ -546,15 +608,15 @@ export default function ClientDetailPage() {
                     >✕</button>
                   </div>
                   {cred.usuario && (
-                  <div style={{ marginBottom: 8 }}>
-                  <div style={{ fontSize: 11, color: theme.textMuted, marginBottom: 2 }}>USUARIO</div>
-                  <div style={{ fontSize: 13, color: theme.textPrimary, fontWeight: 500, fontFamily: 'monospace' }}>{cred.usuario}</div>
-                  </div>
+                    <div style={{ marginBottom: 8 }}>
+                      <div style={{ fontSize: 11, color: theme.textMuted, marginBottom: 2 }}>USUARIO</div>
+                      <div style={{ fontSize: 13, color: theme.textPrimary, fontWeight: 500, fontFamily: 'monospace' }}>{cred.usuario}</div>
+                    </div>
                   )}
                   <div style={{ marginBottom: 8 }}>
-                  <div style={{ fontSize: 11, color: theme.textMuted, marginBottom: 2 }}>CONTRASEÑA</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 13, color: theme.textPrimary, fontFamily: 'monospace', flex: 1 }}>
+                    <div style={{ fontSize: 11, color: theme.textMuted, marginBottom: 2 }}>CONTRASEÑA</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 13, color: theme.textPrimary, fontFamily: 'monospace', flex: 1 }}>
                         {revealed[cred.id] ?? '••••••••'}
                       </span>
                       <button
@@ -570,6 +632,19 @@ export default function ClientDetailPage() {
                     <div>
                       <div style={{ fontSize: 11, color: theme.textMuted, marginBottom: 2 }}>PIN</div>
                       <div style={{ fontSize: 13, color: theme.textPrimary, fontFamily: 'monospace' }}>{cred.pin}</div>
+                    </div>
+                  )}
+                  {cred.url && (
+                    <div style={{ marginTop: 8 }}>
+                      <div style={{ fontSize: 11, color: theme.textMuted, marginBottom: 2 }}>URL</div>
+                      <a href={cred.url.startsWith('http') ? cred.url : `https://${cred.url}`} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: theme.accent, textDecoration: 'none' }}>
+                        {cred.url}
+                      </a>
+                    </div>
+                  )}
+                  {cred.mfa && (
+                    <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 12, padding: '2px 6px', background: '#FEF3C7', color: '#D97706', borderRadius: 4, fontWeight: 600 }}>MFA Requerido</span>
                     </div>
                   )}
                   {cred.notas && <div style={{ marginTop: 10, fontSize: 12, color: theme.textMuted, borderTop: `1px solid ${theme.tableBorder}`, paddingTop: 8 }}>{cred.notas}</div>}
@@ -599,6 +674,11 @@ export default function ClientDetailPage() {
                     <CredField label="Usuario" value={credForm.usuario} onChange={v => setCredForm(f => ({ ...f, usuario: v }))} />
                     <CredField label="Contraseña" type="password" value={credForm.password} onChange={v => setCredForm(f => ({ ...f, password: v }))} />
                     <CredField label="PIN (opcional)" value={credForm.pin} onChange={v => setCredForm(f => ({ ...f, pin: v }))} />
+                    <CredField label="URL Plataforma (opcional)" value={(credForm as any).url || ''} onChange={v => setCredForm(f => ({ ...f, url: v }))} placeholder="https://..." />
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: theme.textPrimary, cursor: 'pointer', marginTop: 4 }}>
+                      <input type="checkbox" checked={(credForm as any).mfa || false} onChange={e => setCredForm(f => ({ ...f, mfa: e.target.checked }))} style={{ accentColor: theme.accent, width: 16, height: 16 }} />
+                      Requiere MFA / Token
+                    </label>
                     <CredField label="Notas" value={credForm.notas} onChange={v => setCredForm(f => ({ ...f, notas: v }))} />
                   </div>
                   {credError && <div style={{ background: '#FEE2E2', color: '#DC2626', borderRadius: 7, padding: '8px 12px', fontSize: 13, marginTop: 12 }}>{credError}</div>}
@@ -606,6 +686,53 @@ export default function ClientDetailPage() {
                     <button type="button" onClick={() => setShowCredModal(false)} style={{ padding: '8px 18px', borderRadius: 7, border: `1px solid ${theme.cardBorder}`, background: theme.cardBg, color: theme.textSecondary, fontSize: 14, cursor: 'pointer' }}>Cancelar</button>
                     <button type="submit" disabled={savingCred} style={{ padding: '8px 20px', borderRadius: 7, border: 'none', background: theme.accent, color: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer', opacity: savingCred ? 0.7 : 1 }}>
                       {savingCred ? 'Guardando...' : 'Guardar'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* Modal Autenticación Contador para ver credenciales */}
+          {showAuthModal && (
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, backdropFilter: 'blur(2px)' }}
+              onClick={e => e.target === e.currentTarget && setShowAuthModal(false)}>
+              <div style={{ background: theme.cardBg, borderRadius: 16, padding: '32px', width: 400, boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', border: `1px solid ${theme.cardBorder}` }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+                  <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#FEF2F2', color: '#DC2626', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
+                    🔒
+                  </div>
+                  <div>
+                    <h2 style={{ fontSize: 18, fontWeight: 700, color: theme.textPrimary, margin: 0 }}>Acceso Seguro</h2>
+                    <p style={{ fontSize: 13, color: theme.textSecondary, margin: '2px 0 0 0' }}>Ingresa tu contraseña para continuar</p>
+                  </div>
+                </div>
+
+                <form onSubmit={handleAuthSubmit}>
+                  <div style={{ marginBottom: 20 }}>
+                    <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: theme.textSecondary, marginBottom: 8 }}>Contraseña de contador</label>
+                    <input
+                      type="password"
+                      value={authPassword}
+                      onChange={e => setAuthPassword(e.target.value)}
+                      placeholder="••••••••"
+                      autoFocus
+                      required
+                      style={{
+                        width: '100%', padding: '10px 14px', borderRadius: 8,
+                        border: `1px solid ${authError ? '#EF4444' : theme.inputBorder}`,
+                        fontSize: 15, background: theme.inputBg, color: theme.textPrimary, boxSizing: 'border-box'
+                      }}
+                    />
+                    {authError && <div style={{ color: '#EF4444', fontSize: 12, marginTop: 6, fontWeight: 500 }}>{authError}</div>}
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+                    <button type="button" onClick={() => setShowAuthModal(false)} style={{ padding: '9px 16px', borderRadius: 8, border: `1px solid ${theme.cardBorder}`, background: 'transparent', color: theme.textSecondary, fontSize: 14, fontWeight: 500, cursor: 'pointer', transition: 'all 0.2s' }}>
+                      Cancelar
+                    </button>
+                    <button type="submit" style={{ padding: '9px 24px', borderRadius: 8, border: 'none', background: theme.accent, color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer', boxShadow: `0 4px 12px ${theme.accent}40`, transition: 'all 0.2s' }}>
+                      Autorizar
                     </button>
                   </div>
                 </form>
@@ -650,9 +777,9 @@ export default function ClientDetailPage() {
                 <tbody>
                   {honorarios.map((h, i) => {
                     const estadoColors = {
-                      al_dia:    { bg: '#DCFCE7', color: '#15803D', label: 'Al día' },
+                      al_dia: { bg: '#DCFCE7', color: '#15803D', label: 'Al día' },
                       pendiente: { bg: '#FEF3C7', color: '#D97706', label: 'Pendiente' },
-                      vencido:   { bg: '#FEE2E2', color: '#DC2626', label: 'Vencido' },
+                      vencido: { bg: '#FEE2E2', color: '#DC2626', label: 'Vencido' },
                     };
                     const sc = estadoColors[h.estado] ?? estadoColors.pendiente;
                     const pendiente = Number(h.montoAcordado) - Number(h.montoCobrado);
@@ -686,11 +813,11 @@ export default function ClientDetailPage() {
                             )}
                             <button onClick={() => openEditHon(h)} title="Editar"
                               style={{ padding: '4px 8px', borderRadius: 6, border: `1px solid ${theme.cardBorder}`, background: theme.cardBg, cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-                              <svg width="13" height="13" fill="none" stroke={theme.textSecondary} strokeWidth="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                              <svg width="13" height="13" fill="none" stroke={theme.textSecondary} strokeWidth="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
                             </button>
                             <button onClick={() => handleDeleteHon(h.id)} title="Eliminar"
                               style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #FEE2E2', background: '#FFF5F5', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-                              <svg width="13" height="13" fill="none" stroke="#DC2626" strokeWidth="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                              <svg width="13" height="13" fill="none" stroke="#DC2626" strokeWidth="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></svg>
                             </button>
                           </div>
                         </td>
@@ -825,9 +952,9 @@ export default function ClientDetailPage() {
             {(() => {
               const filtered = movFiltroTipo ? movimientos.filter(m => m.tipo === movFiltroTipo) : movimientos;
               const TIPO_COLORS: Record<TipoMovimiento, { bg: string; color: string; label: string }> = {
-                venta:  { bg: '#DCFCE7', color: '#15803D', label: '↑ Venta' },
+                venta: { bg: '#DCFCE7', color: '#15803D', label: '↑ Venta' },
                 compra: { bg: '#FEF3C7', color: '#D97706', label: '↓ Compra' },
-                gasto:  { bg: '#FEE2E2', color: '#DC2626', label: '↓ Gasto' },
+                gasto: { bg: '#FEE2E2', color: '#DC2626', label: '↓ Gasto' },
               };
               if (filtered.length === 0) return (
                 <div style={{ padding: 48, textAlign: 'center' }}>
@@ -880,11 +1007,11 @@ export default function ClientDetailPage() {
                             <div style={{ display: 'flex', gap: 6 }}>
                               <button onClick={() => openEditMov(m)}
                                 style={{ padding: '4px 8px', borderRadius: 6, border: `1px solid ${theme.cardBorder}`, background: theme.cardBg, cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-                                <svg width="13" height="13" fill="none" stroke={theme.textSecondary} strokeWidth="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                <svg width="13" height="13" fill="none" stroke={theme.textSecondary} strokeWidth="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
                               </button>
                               <button onClick={() => handleDeleteMov(m.id)}
                                 style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #FEE2E2', background: '#FFF5F5', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-                                <svg width="13" height="13" fill="none" stroke="#DC2626" strokeWidth="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                                <svg width="13" height="13" fill="none" stroke="#DC2626" strokeWidth="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></svg>
                               </button>
                             </div>
                           </td>

@@ -10,6 +10,7 @@ import { PaymentsModule } from './modules/payments/payments.module';
 import { FeesModule } from './modules/fees/fees.module';
 import { MovementsModule } from './modules/movements/movements.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { WebauthnModule } from './auth/webauthn/webauthn.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
     FeesModule,
     MovementsModule,
     NotificationsModule,
+    WebauthnModule,
   ],
 })
 export class AppModule {}

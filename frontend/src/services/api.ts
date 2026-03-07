@@ -36,6 +36,7 @@ export default api;
 export const authApi = {
   login: (email: string, password: string) => api.post('/auth/login', { email, password }),
   refresh: (refreshToken: string) => api.post('/auth/refresh', { refreshToken }),
+  getCredentialsToken: (password: string) => api.post('/auth/credentials-token', { password }),
 };
 
 // ── Users (admin) ─────────────────────────────────────────────────────────────
@@ -68,7 +69,9 @@ export const calendarApi = {
 // ── Credenciales ──────────────────────────────────────────────────────────────
 export const credentialsApi = {
   getByClient: (clientId: string) => api.get(`/credentials/client/${clientId}`),
-  reveal: (id: string) => api.get(`/credentials/${id}/reveal`),
+  reveal: (id: string, token: string) => api.get(`/credentials/${id}/reveal`, {
+    headers: { 'x-credentials-token': token }
+  }),
   create: (data: any) => api.post('/credentials', data),
   delete: (id: string) => api.delete(`/credentials/${id}`),
 };
@@ -100,4 +103,5 @@ export const notificationsApi = {
   getAll: () => api.get('/notifications'),
   unreadCount: () => api.get('/notifications/unread-count'),
   markAllRead: () => api.patch('/notifications/read-all'),
+  createManual: (data: { usuarioId: string; mensaje: string }) => api.post('/notifications', data),
 };

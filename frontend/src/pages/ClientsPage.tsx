@@ -74,10 +74,11 @@ const TRIBUTOS_LABELS: { key: keyof PerfilTributario; label: string }[] = [
 
 const EMPTY_FORM = {
   nombre: '', apellido: '', ci: '', telefono: '', email: '', direccion: '',
-  razonSocial: '', rut: '', tipoEmpresa: '' as TipoEmpresa | '',
+  razonSocial: '', rut: '', nroBps: '', tipoEmpresa: '' as TipoEmpresa | '',
   giro: '', fechaInicioActividades: '', notas: '',
   contribuyenteIva: false, liquidaIrae: false, irpfCat1: false, irpfCat2: false,
   empleadorBps: false, fonasa: false, cjppu: false, fondoSolidaridad: false,
+  exoneracionIva: false, exoneracionIrae: false, exoneracionDetalle: '',
   crearUsuario: false, userPassword: '',
 };
 
@@ -209,6 +210,9 @@ function ClientModal({
               <Field label="Razón Social" value={form.razonSocial} onChange={set('razonSocial')} placeholder="Ej: Empresa SAS" />
               <div className="grid grid-cols-2 gap-3">
                 <Field label="RUT" value={form.rut} onChange={set('rut')} placeholder="210000000010" />
+                <Field label="Nro. BPS" value={form.nroBps} onChange={set('nroBps')} placeholder="Opcional" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label>Tipo</Label>
                   <Select value={form.tipoEmpresa || 'none'} onValueChange={(v) => setForm(f => ({ ...f, tipoEmpresa: v === 'none' ? '' : (v as TipoEmpresa) }))}>
@@ -244,6 +248,17 @@ function ClientModal({
                     onChange={v => setForm(f => ({ ...f, [key]: v }))}
                   />
                 ))}
+              </div>
+              
+              <div className="mt-4 pt-3 border-t">
+                <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Exoneraciones</p>
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  <CheckField label="Exoneración IVA" checked={form.exoneracionIva as boolean} onChange={v => setForm(f => ({ ...f, exoneracionIva: v }))} />
+                  <CheckField label="Exoneración IRAE" checked={form.exoneracionIrae as boolean} onChange={v => setForm(f => ({ ...f, exoneracionIrae: v }))} />
+                </div>
+                {(form.exoneracionIva || form.exoneracionIrae) && (
+                  <Field label="Detalle de exoneración" value={form.exoneracionDetalle as string} onChange={set('exoneracionDetalle')} placeholder="Resolución o motivo..." />
+                )}
               </div>
             </FormSection>
 
@@ -341,7 +356,7 @@ export default function ClientsPage() {
   const toFormData = (c: Client): FormData => ({
     nombre: c.nombre, apellido: c.apellido, ci: c.ci ?? '',
     telefono: c.telefono ?? '', email: c.email ?? '', direccion: c.direccion ?? '',
-    razonSocial: c.razonSocial ?? '', rut: c.rut ?? '',
+    razonSocial: c.razonSocial ?? '', rut: c.rut ?? '', nroBps: c.nroBps ?? '',
     tipoEmpresa: c.tipoEmpresa ?? '',
     giro: c.giro ?? '',
     fechaInicioActividades: c.fechaInicioActividades
@@ -350,6 +365,7 @@ export default function ClientsPage() {
     contribuyenteIva: c.contribuyenteIva, liquidaIrae: c.liquidaIrae,
     irpfCat1: c.irpfCat1, irpfCat2: c.irpfCat2, empleadorBps: c.empleadorBps,
     fonasa: c.fonasa, cjppu: c.cjppu, fondoSolidaridad: c.fondoSolidaridad,
+    exoneracionIva: c.exoneracionIva || false, exoneracionIrae: c.exoneracionIrae || false, exoneracionDetalle: c.exoneracionDetalle ?? '',
     crearUsuario: false, userPassword: '',
   });
 

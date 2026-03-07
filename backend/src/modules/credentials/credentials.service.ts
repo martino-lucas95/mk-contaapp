@@ -11,6 +11,8 @@ export interface CreateCredentialDto {
   usuario?: string;
   password?: string;       // texto plano — se encripta antes de guardar
   pin?: string;
+  url?: string;
+  mfa?: boolean;
   notas?: string;
 }
 
@@ -21,6 +23,8 @@ export interface CredentialPublicDto {
   nombrePlataforma?: string;
   usuario?: string;
   pin?: string;
+  url?: string;
+  mfa?: boolean;
   notas?: string;
   vigente: boolean;
   createdAt: Date;
@@ -37,7 +41,7 @@ export class CredentialsService {
   constructor(
     @InjectRepository(Credential) private credRepo: Repository<Credential>,
     private encryptionService: EncryptionService,
-  ) {}
+  ) { }
 
   // ── Listar credenciales de un cliente (SIN mostrar password) ──────────────
   async findByClient(clientId: string, userRole: UserRole): Promise<CredentialPublicDto[]> {
@@ -73,13 +77,15 @@ export class CredentialsService {
 
     const cred = this.credRepo.create({
       clientId,
-      plataforma:        dto.plataforma,
-      nombrePlataforma:  dto.nombrePlataforma,
-      usuario:           dto.usuario,
+      plataforma: dto.plataforma,
+      nombrePlataforma: dto.nombrePlataforma,
+      usuario: dto.usuario,
       passwordEncriptado,
-      pin:               dto.pin,
-      notas:             dto.notas,
-      vigente:           true,
+      pin: dto.pin,
+      url: dto.url,
+      mfa: dto.mfa ?? false,
+      notas: dto.notas,
+      vigente: true,
     });
 
     const saved = await this.credRepo.save(cred);
@@ -97,11 +103,13 @@ export class CredentialsService {
         ? this.encryptionService.encrypt(dto.password)
         : null;
     }
-    if (dto.usuario          !== undefined) cred.usuario          = dto.usuario;
-    if (dto.pin              !== undefined) cred.pin              = dto.pin;
-    if (dto.notas            !== undefined) cred.notas            = dto.notas;
+    if (dto.usuario !== undefined) cred.usuario = dto.usuario;
+    if (dto.pin !== undefined) cred.pin = dto.pin;
+    if (dto.url !== undefined) cred.url = dto.url;
+    if (dto.mfa !== undefined) cred.mfa = dto.mfa;
+    if (dto.notas !== undefined) cred.notas = dto.notas;
     if (dto.nombrePlataforma !== undefined) cred.nombrePlataforma = dto.nombrePlataforma;
-    if (dto.plataforma       !== undefined) cred.plataforma       = dto.plataforma;
+    if (dto.plataforma !== undefined) cred.plataforma = dto.plataforma;
 
     const saved = await this.credRepo.save(cred);
     return this.toPublicDto(saved);
@@ -125,16 +133,18 @@ export class CredentialsService {
 
   private toPublicDto(cred: Credential): CredentialPublicDto {
     return {
-      id:               cred.id,
-      clientId:         cred.clientId,
-      plataforma:       cred.plataforma,
+      id: cred.id,
+      clientId: cred.clientId,
+      plataforma: cred.plataforma,
       nombrePlataforma: cred.nombrePlataforma,
-      usuario:          cred.usuario,
-      pin:              cred.pin,
-      notas:            cred.notas,
-      vigente:          cred.vigente,
-      createdAt:        cred.createdAt,
-      updatedAt:        cred.updatedAt,
+      usuario: cred.usuario,
+      pin: cred.pin,
+      url: cred.url,
+      mfa: cred.mfa,
+      notas: cred.notas,
+      vigente: cred.vigente,
+      createdAt: cred.createdAt,
+      updatedAt: cred.updatedAt,
     };
   }
 }

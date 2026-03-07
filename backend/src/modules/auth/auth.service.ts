@@ -12,7 +12,7 @@ export class AuthService {
     @InjectRepository(User) private userRepo: Repository<User>,
     private jwtService: JwtService,
     private config: ConfigService,
-  ) {}
+  ) { }
 
   async validateUser(email: string, password: string): Promise<User> {
     const user = await this.userRepo.findOne({
@@ -59,5 +59,10 @@ export class AuthService {
     } catch {
       throw new UnauthorizedException('Refresh token inválido o expirado');
     }
+  }
+
+  async generateCredentialsToken(userId: string): Promise<string> {
+    const payload = { sub: userId, scope: 'credentials_reveal' };
+    return this.jwtService.sign(payload, { expiresIn: '10m' });
   }
 }

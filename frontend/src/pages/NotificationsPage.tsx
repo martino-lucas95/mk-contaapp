@@ -1,45 +1,60 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { notificationsApi } from '../services/api';
+import { notificationsApi, clientsApi } from '../services/api';
 import { useThemeStore } from '../store/theme.store';
-import { Notificacion, TipoNotificacion } from '../types';
+import { useAuthStore } from '../store/auth.store';
+import { Notificacion, TipoNotificacion, Client } from '../types';
 
 const TIPO_CONFIG: Record<TipoNotificacion, { icon: string; color: string; bg: string }> = {
-  vencimiento_proximo:  { icon: '📅', color: '#D97706', bg: '#FEF3C7' },
-  boleto_pendiente:     { icon: '🧾', color: '#0EA5E9', bg: '#E0F2FE' },
-  honorario_vencido:    { icon: '💰', color: '#DC2626', bg: '#FEE2E2' },
-  pago_confirmado:      { icon: '✅', color: '#15803D', bg: '#DCFCE7' },
-  consulta_recibida:    { icon: '💬', color: '#7C3AED', bg: '#EDE9FE' },
-  consulta_respondida:  { icon: '💬', color: '#2563EB', bg: '#DBEAFE' },
-  sistema:              { icon: '⚙️', color: '#64748B', bg: '#F1F5F9' },
+  vencimiento_proximo: { icon: '📅', color: '#D97706', bg: '#FEF3C7' },
+  boleto_pendiente: { icon: '🧾', color: '#0EA5E9', bg: '#E0F2FE' },
+  honorario_vencido: { icon: '💰', color: '#DC2626', bg: '#FEE2E2' },
+  pago_confirmado: { icon: '✅', color: '#15803D', bg: '#DCFCE7' },
+  consulta_recibida: { icon: '💬', color: '#7C3AED', bg: '#EDE9FE' },
+  consulta_respondida: { icon: '💬', color: '#2563EB', bg: '#DBEAFE' },
+  sistema: { icon: '⚙️', color: '#64748B', bg: '#F1F5F9' },
 };
 
 function tiempoRelativo(fecha: string): string {
   const diff = Date.now() - new Date(fecha).getTime();
   const mins = Math.floor(diff / 60000);
-  const hs   = Math.floor(diff / 3600000);
+  const hs = Math.floor(diff / 3600000);
   const dias = Math.floor(diff / 86400000);
-  if (mins < 1)  return 'Ahora mismo';
+  if (mins < 1) return 'Ahora mismo';
   if (mins < 60) return `Hace ${mins} min`;
-  if (hs < 24)   return `Hace ${hs} h`;
-  if (dias < 7)  return `Hace ${dias} día${dias > 1 ? 's' : ''}`;
+  if (hs < 24) return `Hace ${hs} h`;
+  if (dias < 7) return `Hace ${dias} día${dias > 1 ? 's' : ''}`;
   return new Date(fecha).toLocaleDateString('es-UY');
 }
 
 export default function NotificationsPage() {
   const { theme } = useThemeStore();
+  const { user } = useAuthStore();
   const navigate = useNavigate();
-  const [notifs, setNotifs]       = useState<Notificacion[]>([]);
-  const [loading, setLoading]     = useState(true);
-  const [marking, setMarking]     = useState(false);
-  const [filtro, setFiltro]       = useState<'todas' | 'sin_leer'>('todas');
+  const [notifs, setNotifs] = useState<Notificacion[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [marking, setMarking] = useState(false);
+  const [filtro, setFiltro] = useState<'todas' | 'sin_leer'>('todas');
+
+  // Modal state
+  const [showModal, setShowModal] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [form, setForm] = useState({ clienteId: '', mensaje: '' });
+  const [error, setError] = useState('');
+
+  const esContadorOAdmin = user?.role === 'admin' || user?.role === 'contador';
 
   useEffect(() => {
     notificationsApi.getAll()
       .then(({ data }) => setNotifs(data))
       .catch(() => setNotifs([]))
       .finally(() => setLoading(false));
-  }, []);
+
+    if (esContadorOAdmin) {
+      clientsApi.getAll().then(({ data }) => setClients(data.filter((c: Client) => c.usuarioClienteId)));
+    }
+  }, [esContadorOAdmin]);
 
   const handleMarcarTodas = async () => {
     setMarking(true);
@@ -48,6 +63,27 @@ export default function NotificationsPage() {
       setNotifs(ns => ns.map(n => ({ ...n, leido: true })));
     } finally {
       setMarking(false);
+    }
+  };
+
+  const handleSendManual = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.clienteId || !form.mensaje) return;
+    setSending(true); setError('');
+    try {
+      const client = clients.find(c => c.id === form.clienteId);
+      if (!client || !client.usuarioClienteId) throw new Error('Cliente sin usuario asociado');
+
+      await notificationsApi.createManual({ usuarioId: client.usuarioClienteId, mensaje: form.mensaje });
+      setShowModal(false);
+      setForm({ clienteId: '', mensaje: '' });
+      // Refetch notifications
+      const { data } = await notificationsApi.getAll();
+      setNotifs(data);
+    } catch (err: any) {
+      setError(err?.response?.data?.message || err.message || 'Error al enviar');
+    } finally {
+      setSending(false);
     }
   };
 
@@ -79,20 +115,34 @@ export default function NotificationsPage() {
             {notifs.length} notificación{notifs.length !== 1 ? 'es' : ''} en total
           </p>
         </div>
-        {sinLeer > 0 && (
-          <button
-            onClick={handleMarcarTodas}
-            disabled={marking}
-            style={{
-              padding: '8px 16px', borderRadius: 8,
-              border: `1px solid ${theme.cardBorder}`,
-              background: theme.cardBg, color: theme.textSecondary,
-              fontSize: 13, cursor: 'pointer', opacity: marking ? 0.6 : 1,
-            }}
-          >
-            {marking ? 'Marcando...' : '✓ Marcar todas como leídas'}
-          </button>
-        )}
+        <div style={{ display: 'flex', gap: 10 }}>
+          {esContadorOAdmin && (
+            <button
+              onClick={() => { setShowModal(true); setError(''); }}
+              style={{
+                padding: '8px 16px', borderRadius: 8, border: 'none',
+                background: theme.accent, color: '#fff',
+                fontSize: 13, fontWeight: 500, cursor: 'pointer',
+              }}
+            >
+              + Enviar notificación
+            </button>
+          )}
+          {sinLeer > 0 && (
+            <button
+              onClick={handleMarcarTodas}
+              disabled={marking}
+              style={{
+                padding: '8px 16px', borderRadius: 8,
+                border: `1px solid ${theme.cardBorder}`,
+                background: theme.cardBg, color: theme.textSecondary,
+                fontSize: 13, cursor: 'pointer', opacity: marking ? 0.6 : 1,
+              }}
+            >
+              {marking ? 'Marcando...' : '✓ Marcar todas'}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Filtros */}
@@ -195,6 +245,48 @@ export default function NotificationsPage() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Modal Enviar Notificación */}
+      {showModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
+          onClick={e => e.target === e.currentTarget && setShowModal(false)}>
+          <div style={{ background: theme.cardBg, borderRadius: 14, padding: '28px', width: 440, boxShadow: '0 20px 40px rgba(0,0,0,0.25)', border: `1px solid ${theme.cardBorder}` }}>
+            <h2 style={{ fontSize: 17, fontWeight: 700, color: theme.textPrimary, marginBottom: 6 }}>Nueva notificación manual</h2>
+            <p style={{ fontSize: 13, color: theme.textSecondary, marginBottom: 20 }}>Enviará un aviso al portal del cliente seleccionado.</p>
+
+            <form onSubmit={handleSendManual}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: theme.textSecondary, marginBottom: 5 }}>Cliente destinatario <span style={{ color: '#DC2626' }}>*</span></label>
+                  <select value={form.clienteId} onChange={e => setForm(f => ({ ...f, clienteId: e.target.value }))} required
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: 7, border: `1px solid ${theme.inputBorder}`, fontSize: 14, background: theme.inputBg, color: theme.textPrimary, boxSizing: 'border-box' as const }}>
+                    <option value="" disabled>Seleccionar un cliente con portal activo...</option>
+                    {clients.map(c => (
+                      <option key={c.id} value={c.id}>{c.nombre} {c.apellido} {c.razonSocial ? `(${c.razonSocial})` : ''}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: theme.textSecondary, marginBottom: 5 }}>Mensaje <span style={{ color: '#DC2626' }}>*</span></label>
+                  <textarea value={form.mensaje} onChange={e => setForm(f => ({ ...f, mensaje: e.target.value }))} required rows={4}
+                    placeholder="Ej: Estimado cliente, recordamos que debe enviarnos las facturas de este mes antes del viernes."
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: 7, border: `1px solid ${theme.inputBorder}`, fontSize: 14, background: theme.inputBg, color: theme.textPrimary, boxSizing: 'border-box' as const, resize: 'vertical' }} />
+                </div>
+              </div>
+
+              {error && <div style={{ background: '#FEE2E2', color: '#DC2626', borderRadius: 7, padding: '8px 12px', fontSize: 13, marginTop: 14 }}>{error}</div>}
+
+              <div style={{ display: 'flex', gap: 10, marginTop: 24, justifyContent: 'flex-end' }}>
+                <button type="button" onClick={() => setShowModal(false)} style={{ padding: '8px 18px', borderRadius: 7, border: `1px solid ${theme.cardBorder}`, background: theme.cardBg, color: theme.textSecondary, fontSize: 14, cursor: 'pointer' }}>Cancelar</button>
+                <button type="submit" disabled={sending || !form.clienteId || !form.mensaje} style={{ padding: '8px 20px', borderRadius: 7, border: 'none', background: theme.accent, color: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer', opacity: (sending || !form.clienteId || !form.mensaje) ? 0.7 : 1 }}>
+                  {sending ? 'Enviando...' : 'Enviar mensaje'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

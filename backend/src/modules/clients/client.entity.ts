@@ -71,6 +71,9 @@ export class Client {
   @Column({ length: 12, nullable: true, unique: true })
   rut: string;
 
+  @Column({ length: 50, nullable: true })
+  nroBps: string;
+
   @Column({ type: 'enum', enum: TipoEmpresa, nullable: true })
   tipoEmpresa: TipoEmpresa | null;
 
@@ -104,6 +107,16 @@ export class Client {
 
   @Column({ default: false })
   fondoSolidaridad: boolean;
+
+  // ── Exoneraciones ──────────────────────────────────────────────────
+  @Column({ default: false })
+  exoneracionIva: boolean;
+
+  @Column({ default: false })
+  exoneracionIrae: boolean;
+
+  @Column({ type: 'text', nullable: true })
+  exoneracionDetalle: string;
 
   // ── Estado ────────────────────────────────────────────────────────
   @Column({ type: 'enum', enum: EstadoCliente, default: EstadoCliente.ACTIVO })

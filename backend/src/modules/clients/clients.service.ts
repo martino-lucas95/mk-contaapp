@@ -40,6 +40,9 @@ export class CreateClientDto {
   rut?: string;
 
   @IsOptional() @IsString()
+  nroBps?: string;
+
+  @IsOptional() @IsString()
   tipoEmpresa?: string;
 
   @IsOptional() @IsString()
@@ -71,6 +74,15 @@ export class CreateClientDto {
 
   @IsOptional() @IsBoolean()
   fondoSolidaridad?: boolean;
+
+  @IsOptional() @IsBoolean()
+  exoneracionIva?: boolean;
+
+  @IsOptional() @IsBoolean()
+  exoneracionIrae?: boolean;
+
+  @IsOptional() @IsString()
+  exoneracionDetalle?: string;
 
   @IsOptional() @IsString()
   notas?: string;
