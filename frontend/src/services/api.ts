@@ -57,9 +57,10 @@ export const clientsApi = {
 
 // ── Calendario / Vencimientos ─────────────────────────────────────────────────
 export const calendarApi = {
-  getProximos: ()                          => api.get('/calendar/proximos'),
-  getByClient: (clientId: string)          => api.get(`/calendar/client/${clientId}`),
-  generar:     (clientId: string)          => api.post(`/calendar/client/${clientId}/generar`),
+  getProximos:  ()                          => api.get('/calendar/proximos'),
+  getByClient:  (clientId: string)          => api.get(`/calendar/client/${clientId}`),
+  generar:      (clientId: string)          => api.post(`/calendar/client/${clientId}/generar`),
+  completar:    (id: string)                => api.patch(`/calendar/${id}/completar`),
 };
 
 // ── Credenciales ──────────────────────────────────────────────────────────────

@@ -116,6 +116,23 @@ const CheckField = ({ label, checked, onChange }: { label: string; checked: bool
   </label>
 );
 
+// ── Sección del formulario ────────────────────────────────────────────────────
+function FormSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div style={{ marginBottom: 24 }}>
+      <div style={{
+        fontSize: 11, fontWeight: 700, color: '#94A3B8',
+        textTransform: 'uppercase', letterSpacing: '0.07em',
+        marginBottom: 12, paddingBottom: 8,
+        borderBottom: '1px solid #F1F5F9',
+      }}>{title}</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 // ── Modal ─────────────────────────────────────────────────────────────────────
 function ClientModal({
   open, onClose, onSave, initial, editId,
@@ -129,14 +146,10 @@ function ClientModal({
   const [form, setForm] = useState<FormData>(initial ?? EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [tab, setTab] = useState<'personal' | 'empresa' | 'tributos'>('personal');
+  const isMobile = window.innerWidth < 768;
 
   useEffect(() => {
-    if (open) {
-      setForm(initial ?? EMPTY_FORM);
-      setTab('personal');
-      setError('');
-    }
+    if (open) { setForm(initial ?? EMPTY_FORM); setError(''); }
   }, [open]);
 
   const set = (k: keyof FormData) => (v: string | boolean) =>
@@ -146,7 +159,12 @@ function ClientModal({
     e.preventDefault();
     setSaving(true); setError('');
     try {
-      const payload = { ...form, tipoEmpresa: form.tipoEmpresa || undefined };
+      const payload = {
+        ...form,
+        tipoEmpresa: form.tipoEmpresa || undefined,
+        nombre: form.nombre.trim() || form.razonSocial.trim() || 'Sin nombre',
+        apellido: form.apellido.trim() || '-',
+      };
       if (editId) {
         await clientsApi.update(editId, payload);
       } else {
@@ -163,135 +181,137 @@ function ClientModal({
 
   if (!open) return null;
 
-  const TAB_STYLE = (active: boolean) => ({
-    padding: '7px 16px', borderRadius: 7, fontSize: 13, fontWeight: 500,
-    cursor: 'pointer', border: 'none',
-    background: active ? '#6D28D9' : 'transparent',
-    color: active ? '#fff' : '#64748B',
-    transition: 'all 0.15s',
-  });
-
   return (
     <div
       style={{
-        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+        display: 'flex',
+        alignItems: isMobile ? 'flex-end' : 'center',
+        justifyContent: 'center', zIndex: 1000,
       }}
       onClick={e => e.target === e.currentTarget && onClose()}
     >
       <div style={{
-        background: '#fff', borderRadius: 16, width: 560,
-        maxHeight: '90vh', display: 'flex', flexDirection: 'column',
+        background: '#fff',
+        borderRadius: isMobile ? '20px 20px 0 0' : 16,
+        width: isMobile ? '100%' : 540,
+        maxHeight: isMobile ? '92vh' : '88vh',
+        display: 'flex', flexDirection: 'column',
         boxShadow: '0 24px 48px rgba(0,0,0,0.18)',
       }}>
         {/* Header */}
-        <div style={{ padding: '24px 28px 0', borderBottom: '1px solid #F1F5F9' }}>
-          <h2 style={{ fontSize: 18, fontWeight: 700, color: '#0F172A', marginBottom: 16 }}>
+        <div style={{
+          padding: '20px 20px 16px',
+          borderBottom: '1px solid #F1F5F9',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          flexShrink: 0,
+        }}>
+          <h2 style={{ fontSize: 17, fontWeight: 700, color: '#0F172A' }}>
             {editId ? 'Editar cliente' : 'Nuevo cliente'}
           </h2>
-          <div style={{ display: 'flex', gap: 4, paddingBottom: 16 }}>
-            {(['personal', 'empresa', 'tributos'] as const).map(t => (
-              <button key={t} onClick={() => setTab(t)} style={TAB_STYLE(tab === t)}>
-                {t === 'personal' ? '👤 Personal' : t === 'empresa' ? '🏢 Empresa' : '📋 Tributario'}
-              </button>
-            ))}
-          </div>
+          <button onClick={onClose} style={{
+            background: 'none', border: 'none', cursor: 'pointer',
+            color: '#94A3B8', display: 'flex', padding: 4,
+          }}>
+            <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
         </div>
 
-        {/* Body */}
+        {/* Body — todo en una sola pantalla con scroll */}
         <form onSubmit={handleSubmit} style={{ overflow: 'auto', flex: 1 }}>
-          <div style={{ padding: '20px 28px' }}>
+          <div style={{ padding: '20px 20px 0' }}>
 
-            {tab === 'personal' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <Field label="Nombre" value={form.nombre} onChange={set('nombre')} required />
-                  <Field label="Apellido" value={form.apellido} onChange={set('apellido')} required />
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <Field label="CI" value={form.ci} onChange={set('ci')} placeholder="12345678" />
-                  <Field label="Teléfono" value={form.telefono} onChange={set('telefono')} placeholder="098 000 000" />
-                </div>
-                <Field label="Email" type="email" value={form.email} onChange={set('email')} />
-                <Field label="Dirección" value={form.direccion} onChange={set('direccion')} />
+            {/* ── Empresa ── */}
+            <FormSection title="🏢 Empresa">
+              <Field label="Razón Social" value={form.razonSocial} onChange={set('razonSocial')} placeholder="Ej: MK Studios SAS" />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <Field label="RUT" value={form.rut} onChange={set('rut')} placeholder="210000000010" />
                 <div>
-                  <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 5 }}>Notas</label>
-                  <textarea
-                    value={form.notas} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))}
-                    rows={3}
-                    style={{
-                      width: '100%', padding: '8px 11px', borderRadius: 7,
-                      border: '1px solid #D1D5DB', fontSize: 14, color: '#0F172A',
-                      outline: 'none', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit',
-                    }}
-                    onFocus={e => (e.target.style.borderColor = '#6D28D9')}
-                    onBlur={e => (e.target.style.borderColor = '#D1D5DB')}
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 5 }}>Tipo</label>
+                  <select
+                    value={form.tipoEmpresa}
+                    onChange={e => setForm(f => ({ ...f, tipoEmpresa: e.target.value as TipoEmpresa | '' }))}
+                    style={{ width: '100%', padding: '9px 11px', borderRadius: 7, border: '1px solid #D1D5DB', fontSize: 14, color: '#0F172A', background: '#fff', boxSizing: 'border-box' as const }}
+                  >
+                    <option value="">Sin especificar</option>
+                    {Object.entries(TIPO_EMPRESA_LABEL).map(([k, v]) => (
+                      <option key={k} value={k}>{v}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <Field label="Giro / Actividad" value={form.giro} onChange={set('giro')} placeholder="Ej: Informática" />
+                <Field label="Inicio actividades" type="date" value={form.fechaInicioActividades} onChange={set('fechaInicioActividades')} />
+              </div>
+              <Field label="Dirección" value={form.direccion} onChange={set('direccion')} placeholder="Ej: Rambla República de Chile 4551" />
+            </FormSection>
+
+            {/* ── Obligaciones tributarias ── */}
+            <FormSection title="📋 Obligaciones tributarias">
+              <p style={{ fontSize: 12, color: '#64748B', marginTop: -6 }}>
+                Determinan los vencimientos que se generan automáticamente.
+              </p>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                {TRIBUTOS_LABELS.map(({ key, label }) => (
+                  <CheckField
+                    key={key} label={label}
+                    checked={form[key] as boolean}
+                    onChange={v => setForm(f => ({ ...f, [key]: v }))}
                   />
-                </div>
+                ))}
               </div>
-            )}
+            </FormSection>
 
-            {tab === 'empresa' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <Field label="Razón Social" value={form.razonSocial} onChange={set('razonSocial')} />
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <Field label="RUT" value={form.rut} onChange={set('rut')} placeholder="210000000010" />
-                  <div>
-                    <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 5 }}>Tipo de empresa</label>
-                    <select
-                      value={form.tipoEmpresa}
-                      onChange={e => setForm(f => ({ ...f, tipoEmpresa: e.target.value as TipoEmpresa | '' }))}
-                      style={{
-                        width: '100%', padding: '8px 11px', borderRadius: 7,
-                        border: '1px solid #D1D5DB', fontSize: 14, color: '#0F172A',
-                        outline: 'none', background: '#fff', boxSizing: 'border-box',
-                      }}
-                    >
-                      <option value="">Sin especificar</option>
-                      {Object.entries(TIPO_EMPRESA_LABEL).map(([k, v]) => (
-                        <option key={k} value={k}>{v}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <Field label="Giro / Actividad" value={form.giro} onChange={set('giro')} />
-                <Field label="Fecha inicio de actividades" type="date" value={form.fechaInicioActividades} onChange={set('fechaInicioActividades')} />
+            {/* ── Datos personales (colapsable, secundario) ── */}
+            <FormSection title="👤 Datos personales (opcional)">
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <Field label="Nombre" value={form.nombre} onChange={set('nombre')} placeholder="Ej: Lucas" />
+                <Field label="Apellido" value={form.apellido} onChange={set('apellido')} placeholder="Ej: Martino" />
               </div>
-            )}
-
-            {tab === 'tributos' && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <Field label="CI" value={form.ci} onChange={set('ci')} placeholder="12345678" />
+                <Field label="Teléfono" value={form.telefono} onChange={set('telefono')} placeholder="098 000 000" />
+              </div>
+              <Field label="Email" type="email" value={form.email} onChange={set('email')} />
               <div>
-                <p style={{ fontSize: 13, color: '#64748B', marginBottom: 16 }}>
-                  Seleccioná las obligaciones tributarias que aplican a este cliente. Esto determinará los vencimientos que se generarán automáticamente.
-                </p>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                  {TRIBUTOS_LABELS.map(({ key, label }) => (
-                    <CheckField
-                      key={key}
-                      label={label}
-                      checked={form[key] as boolean}
-                      onChange={v => setForm(f => ({ ...f, [key]: v }))}
-                    />
-                  ))}
-                </div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 5 }}>Notas</label>
+                <textarea
+                  value={form.notas} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))}
+                  rows={2} placeholder="Observaciones adicionales..."
+                  style={{ width: '100%', padding: '8px 11px', borderRadius: 7, border: '1px solid #D1D5DB', fontSize: 14, color: '#0F172A', outline: 'none', boxSizing: 'border-box' as const, resize: 'vertical', fontFamily: 'inherit' }}
+                  onFocus={e => (e.target.style.borderColor = '#6D28D9')}
+                  onBlur={e => (e.target.style.borderColor = '#D1D5DB')}
+                />
               </div>
-            )}
+            </FormSection>
+
           </div>
 
           {error && (
-            <div style={{ margin: '0 28px', background: '#FEE2E2', color: '#DC2626', borderRadius: 7, padding: '8px 12px', fontSize: 13 }}>
+            <div style={{ margin: '0 20px', background: '#FEE2E2', color: '#DC2626', borderRadius: 7, padding: '8px 12px', fontSize: 13 }}>
               {error}
             </div>
           )}
 
           {/* Footer */}
-          <div style={{ padding: '16px 28px 24px', display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          <div style={{
+            padding: '14px 20px',
+            paddingBottom: isMobile ? 'calc(14px + env(safe-area-inset-bottom))' : '20px',
+            display: 'flex', gap: 10, justifyContent: 'flex-end',
+            borderTop: '1px solid #F1F5F9', flexShrink: 0,
+            position: 'sticky', bottom: 0, background: '#fff',
+          }}>
             <button type="button" onClick={onClose} style={{
-              padding: '8px 20px', borderRadius: 8, border: '1px solid #E2E8F0',
+              flex: isMobile ? 1 : undefined,
+              padding: '10px 20px', borderRadius: 8, border: '1px solid #E2E8F0',
               background: '#fff', color: '#475569', fontSize: 14, cursor: 'pointer',
             }}>Cancelar</button>
             <button type="submit" disabled={saving} style={{
-              padding: '8px 22px', borderRadius: 8, border: 'none',
+              flex: isMobile ? 2 : undefined,
+              padding: '10px 22px', borderRadius: 8, border: 'none',
               background: '#6D28D9', color: '#fff', fontSize: 14, fontWeight: 500,
               cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1,
             }}>

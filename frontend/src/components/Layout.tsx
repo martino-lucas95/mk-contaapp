@@ -1,8 +1,19 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/auth.store';
 import { useThemeStore, THEMES, ThemeId } from '../store/theme.store';
 import { UserRole } from '../types';
+
+// ── Hook: detectar mobile ─────────────────────────────────────────────────────
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+  return isMobile;
+}
 
 // ── Icons ──────────────────────────────────────────────────────────────────────
 const Icons = {
@@ -14,6 +25,8 @@ const Icons = {
   logout:      <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>,
   chevron:     <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>,
   palette:     <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 0 20c-2.76 0-3-1.5-3-3 0-2 1-3 1-5s-1-3-1-5a5 5 0 0 1 3-7z"/></svg>,
+  menu:        <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>,
+  close:       <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
 };
 
 const NAV_ADMIN    = [
@@ -34,14 +47,12 @@ const ROLE_LABEL: Record<UserRole, string> = {
 };
 
 // ── Theme Switcher ─────────────────────────────────────────────────────────────
-function ThemeSwitcher({ collapsed, sidebarText, sidebarBorder }: {
+function ThemeSwitcher({ collapsed, sidebarText }: {
   collapsed: boolean;
   sidebarText: string;
-  sidebarBorder: string;
 }) {
   const { themeId, setTheme } = useThemeStore();
   const [open, setOpen] = useState(false);
-
   const themeList = Object.values(THEMES);
 
   return (
@@ -55,8 +66,7 @@ function ThemeSwitcher({ collapsed, sidebarText, sidebarBorder }: {
           justifyContent: collapsed ? 'center' : 'flex-start',
           width: '100%', borderRadius: 7,
           background: 'none', border: 'none', cursor: 'pointer',
-          color: sidebarText, fontSize: 14, transition: 'all 0.15s',
-          opacity: 0.7,
+          color: sidebarText, fontSize: 14, transition: 'all 0.15s', opacity: 0.7,
         }}
         onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
         onMouseLeave={e => (e.currentTarget.style.opacity = '0.7')}
@@ -67,23 +77,13 @@ function ThemeSwitcher({ collapsed, sidebarText, sidebarBorder }: {
 
       {open && (
         <>
-          {/* Backdrop */}
-          <div
-            style={{ position: 'fixed', inset: 0, zIndex: 998 }}
-            onClick={() => setOpen(false)}
-          />
-          {/* Dropdown */}
+          <div style={{ position: 'fixed', inset: 0, zIndex: 998 }} onClick={() => setOpen(false)} />
           <div style={{
-            position: 'absolute',
-            bottom: '110%',
+            position: 'absolute', bottom: '110%',
             left: collapsed ? '110%' : 0,
-            width: 180,
-            background: '#fff',
-            borderRadius: 10,
+            width: 180, background: '#fff', borderRadius: 10,
             boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
-            border: '1px solid #e2e8f0',
-            overflow: 'hidden',
-            zIndex: 999,
+            border: '1px solid #e2e8f0', overflow: 'hidden', zIndex: 999,
           }}>
             <div style={{ padding: '8px 12px 6px', fontSize: 11, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
               Seleccionar tema
@@ -98,10 +98,7 @@ function ThemeSwitcher({ collapsed, sidebarText, sidebarBorder }: {
                   background: themeId === t.id ? '#f1f5f9' : 'transparent',
                   border: 'none', cursor: 'pointer',
                   fontSize: 13, color: '#0f172a', fontWeight: themeId === t.id ? 600 : 400,
-                  transition: 'background 0.1s',
                 }}
-                onMouseEnter={e => { if (themeId !== t.id) e.currentTarget.style.background = '#f8fafc'; }}
-                onMouseLeave={e => { if (themeId !== t.id) e.currentTarget.style.background = 'transparent'; }}
               >
                 <span style={{ fontSize: 16 }}>{t.emoji}</span>
                 <span>{t.label}</span>
@@ -119,31 +116,275 @@ function ThemeSwitcher({ collapsed, sidebarText, sidebarBorder }: {
   );
 }
 
+// ── Bottom Nav (mobile) ────────────────────────────────────────────────────────
+function BottomNav({ navItems, theme }: { navItems: typeof NAV_CONTADOR; theme: any }) {
+  return (
+    <nav style={{
+      position: 'fixed', bottom: 0, left: 0, right: 0,
+      background: theme.sidebarBg,
+      borderTop: `1px solid ${theme.sidebarBorder}`,
+      display: 'flex',
+      paddingBottom: 'env(safe-area-inset-bottom)',
+      zIndex: 100,
+    }}>
+      {navItems.map(item => (
+        <NavLink
+          key={item.to}
+          to={item.to}
+          end={item.exact}
+          style={({ isActive }) => ({
+            flex: 1,
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            padding: '10px 4px 8px',
+            textDecoration: 'none',
+            color: isActive ? theme.sidebarActive : theme.sidebarTextMuted,
+            fontSize: 10, fontWeight: isActive ? 600 : 400,
+            gap: 4,
+            transition: 'color 0.15s',
+          })}
+        >
+          {item.icon}
+          <span>{item.label}</span>
+        </NavLink>
+      ))}
+    </nav>
+  );
+}
+
+// ── Mobile Header ──────────────────────────────────────────────────────────────
+function MobileHeader({ theme, onMenuOpen }: { theme: any; onMenuOpen: () => void }) {
+  return (
+    <header style={{
+      position: 'fixed', top: 0, left: 0, right: 0,
+      height: 56,
+      background: theme.sidebarBg,
+      borderBottom: `1px solid ${theme.sidebarBorder}`,
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '0 16px',
+      zIndex: 100,
+      paddingTop: 'env(safe-area-inset-top)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{
+          width: 28, height: 28, borderRadius: 7,
+          background: theme.accent,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontWeight: 800, fontSize: 12, color: '#fff',
+        }}>C</div>
+        <span style={{ color: theme.sidebarText, fontWeight: 700, fontSize: 15 }}>ContaApp</span>
+      </div>
+      <button
+        onClick={onMenuOpen}
+        style={{
+          background: 'none', border: 'none', cursor: 'pointer',
+          color: theme.sidebarText, padding: 6, display: 'flex', alignItems: 'center',
+        }}
+      >
+        {Icons.menu}
+      </button>
+    </header>
+  );
+}
+
+// ── Mobile Drawer (menú lateral completo) ─────────────────────────────────────
+function MobileDrawer({ open, onClose, theme, navItems, user, onLogout }: {
+  open: boolean; onClose: () => void; theme: any;
+  navItems: typeof NAV_CONTADOR; user: any; onLogout: () => void;
+}) {
+  const { themeId, setTheme } = useThemeStore();
+  const themeList = Object.values(THEMES);
+  const initials = `${user.nombre[0]}${user.apellido[0]}`.toUpperCase();
+
+  if (!open) return null;
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        onClick={onClose}
+        style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+          zIndex: 200, transition: 'opacity 0.2s',
+        }}
+      />
+      {/* Drawer */}
+      <div style={{
+        position: 'fixed', top: 0, left: 0, bottom: 0,
+        width: 280, background: theme.sidebarBg,
+        zIndex: 201, display: 'flex', flexDirection: 'column',
+        boxShadow: '4px 0 24px rgba(0,0,0,0.2)',
+        paddingTop: 'env(safe-area-inset-top)',
+      }}>
+        {/* Header del drawer */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '16px 16px 12px',
+          borderBottom: `1px solid ${theme.sidebarBorder}`,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{
+              width: 28, height: 28, borderRadius: 7, background: theme.accent,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontWeight: 800, fontSize: 12, color: '#fff',
+            }}>C</div>
+            <span style={{ color: theme.sidebarText, fontWeight: 700, fontSize: 15 }}>ContaApp</span>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: theme.sidebarTextMuted, display: 'flex' }}>
+            {Icons.close}
+          </button>
+        </div>
+
+        {/* Nav items */}
+        <nav style={{ flex: 1, padding: '10px 8px', overflowY: 'auto' }}>
+          {navItems.map(item => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.exact}
+              onClick={onClose}
+              style={({ isActive }) => ({
+                display: 'flex', alignItems: 'center', gap: 12,
+                padding: '11px 14px', borderRadius: 8, marginBottom: 2,
+                textDecoration: 'none',
+                color: isActive ? theme.sidebarActive : theme.sidebarTextMuted,
+                background: isActive ? theme.sidebarActiveBg : 'transparent',
+                fontWeight: isActive ? 600 : 400, fontSize: 15,
+              })}
+            >
+              {item.icon}
+              <span>{item.label}</span>
+            </NavLink>
+          ))}
+        </nav>
+
+        {/* Temas */}
+        <div style={{ padding: '8px 8px 4px', borderTop: `1px solid ${theme.sidebarBorder}` }}>
+          <div style={{ padding: '6px 12px 8px', fontSize: 11, fontWeight: 600, color: theme.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            Tema
+          </div>
+          <div style={{ display: 'flex', gap: 6, padding: '0 8px 12px' }}>
+            {themeList.map(t => (
+              <button
+                key={t.id}
+                onClick={() => setTheme(t.id as ThemeId)}
+                style={{
+                  flex: 1, padding: '8px 4px', borderRadius: 8,
+                  border: `2px solid ${themeId === t.id ? theme.accent : theme.cardBorder}`,
+                  background: themeId === t.id ? theme.accentLight : 'transparent',
+                  cursor: 'pointer', fontSize: 18, display: 'flex',
+                  flexDirection: 'column', alignItems: 'center', gap: 3,
+                }}
+              >
+                <span>{t.emoji}</span>
+                <span style={{ fontSize: 10, color: theme.textSecondary, fontWeight: 500 }}>{t.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* User info + logout */}
+        <div style={{ padding: '8px', borderTop: `1px solid ${theme.sidebarBorder}`, paddingBottom: 'calc(8px + env(safe-area-inset-bottom))' }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            padding: '10px 12px', borderRadius: 8,
+            background: theme.sidebarUserBg, marginBottom: 6,
+          }}>
+            <div style={{
+              width: 34, height: 34, borderRadius: '50%', flexShrink: 0,
+              background: theme.sidebarLogoBg,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 12, fontWeight: 700, color: theme.sidebarText,
+            }}>{initials}</div>
+            <div>
+              <div style={{ color: theme.sidebarText, fontSize: 13, fontWeight: 600 }}>
+                {user.nombre} {user.apellido}
+              </div>
+              <div style={{ color: theme.sidebarTextMuted, fontSize: 11 }}>
+                {ROLE_LABEL[user.role]}
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={onLogout}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              width: '100%', padding: '10px 12px', borderRadius: 8,
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: theme.sidebarTextMuted, fontSize: 14,
+            }}
+          >
+            {Icons.logout}
+            <span>Cerrar sesión</span>
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
 // ── Layout ─────────────────────────────────────────────────────────────────────
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuthStore();
   const { theme } = useThemeStore();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [collapsed, setCollapsed] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   if (!user) return null;
 
   const navItems = user.role === 'admin' ? NAV_ADMIN : NAV_CONTADOR;
   const initials = `${user.nombre[0]}${user.apellido[0]}`.toUpperCase();
   const handleLogout = () => { logout(); navigate('/login'); };
-
-  // Logo accent: azul para light, blanco/suave para dark/blue
   const isLightTheme = theme.id === 'light';
-  const logoAccent = isLightTheme ? theme.accent : theme.sidebarLogoBg;
-  const logoTextColor = isLightTheme ? theme.accent : theme.sidebarText;
 
+  // ── MOBILE ────────────────────────────────────────────────────────────────
+  if (isMobile) {
+    return (
+      <div style={{
+        display: 'flex', flexDirection: 'column', height: '100vh',
+        fontFamily: '"Inter", system-ui, -apple-system, sans-serif',
+        background: theme.mainBg,
+      }}>
+        <MobileHeader theme={theme} onMenuOpen={() => setDrawerOpen(true)} />
+
+        <MobileDrawer
+          open={drawerOpen}
+          onClose={() => setDrawerOpen(false)}
+          theme={theme}
+          navItems={navItems}
+          user={user}
+          onLogout={handleLogout}
+        />
+
+        {/* Main content — con espacio para header y bottom nav */}
+        <main style={{
+          flex: 1,
+          overflowY: 'auto',
+          marginTop: 56,
+          marginBottom: 64,
+          background: theme.mainBg,
+          color: theme.textPrimary,
+          // Safe areas para notch y home indicator
+          paddingLeft: 'env(safe-area-inset-left)',
+          paddingRight: 'env(safe-area-inset-right)',
+        }}>
+          {children}
+        </main>
+
+        <BottomNav navItems={navItems} theme={theme} />
+      </div>
+    );
+  }
+
+  // ── DESKTOP ───────────────────────────────────────────────────────────────
   return (
     <div style={{
       display: 'flex', height: '100vh', overflow: 'hidden',
       fontFamily: '"Inter", system-ui, -apple-system, sans-serif',
       background: theme.mainBg,
     }}>
-      {/* ── Sidebar ── */}
+      {/* Sidebar */}
       <aside style={{
         width: collapsed ? 64 : 224, flexShrink: 0,
         background: theme.sidebarBg,
@@ -151,9 +392,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         transition: 'width 0.22s cubic-bezier(0.4,0,0.2,1)',
         overflow: 'hidden',
         borderRight: `1px solid ${theme.sidebarBorder}`,
-        boxShadow: theme.id === 'light' ? '2px 0 8px rgba(0,0,0,0.04)' : 'none',
+        boxShadow: isLightTheme ? '2px 0 8px rgba(0,0,0,0.04)' : 'none',
       }}>
-
         {/* Header */}
         <div style={{
           display: 'flex', alignItems: 'center', minHeight: 60,
@@ -165,20 +405,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{
                 width: 30, height: 30, borderRadius: 7,
-                background: logoAccent,
+                background: isLightTheme ? theme.accent : theme.sidebarLogoBg,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontWeight: 800, fontSize: 13,
                 color: isLightTheme ? '#fff' : theme.sidebarText,
               }}>C</div>
-              <span style={{
-                color: theme.sidebarText,
-                fontWeight: 700, fontSize: 15, letterSpacing: '-0.3px',
-              }}>ContaApp</span>
+              <span style={{ color: theme.sidebarText, fontWeight: 700, fontSize: 15, letterSpacing: '-0.3px' }}>ContaApp</span>
             </div>
           )}
           <button
             onClick={() => setCollapsed(!collapsed)}
-            title={collapsed ? 'Expandir' : 'Colapsar'}
             style={{
               background: 'none', border: 'none', cursor: 'pointer',
               color: theme.sidebarTextMuted, padding: 4, display: 'flex',
@@ -217,13 +453,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         {/* Footer */}
         <div style={{ padding: '8px 8px 12px', borderTop: `1px solid ${theme.sidebarBorder}` }}>
-          {/* User info */}
           {!collapsed && (
             <div style={{
               display: 'flex', alignItems: 'center', gap: 10,
               padding: '8px 10px', borderRadius: 7,
-              background: theme.sidebarUserBg,
-              marginBottom: 4,
+              background: theme.sidebarUserBg, marginBottom: 4,
             }}>
               <div style={{
                 width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
@@ -235,21 +469,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <div style={{ color: theme.sidebarText, fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {user.nombre} {user.apellido}
                 </div>
-                <div style={{ color: theme.sidebarTextMuted, fontSize: 11 }}>
-                  {ROLE_LABEL[user.role]}
-                </div>
+                <div style={{ color: theme.sidebarTextMuted, fontSize: 11 }}>{ROLE_LABEL[user.role]}</div>
               </div>
             </div>
           )}
-
-          {/* Theme switcher */}
-          <ThemeSwitcher
-            collapsed={collapsed}
-            sidebarText={theme.sidebarText}
-            sidebarBorder={theme.sidebarBorder}
-          />
-
-          {/* Logout */}
+          <ThemeSwitcher collapsed={collapsed} sidebarText={theme.sidebarText} />
           <button
             onClick={handleLogout}
             title="Cerrar sesión"
@@ -259,7 +483,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               justifyContent: collapsed ? 'center' : 'flex-start',
               width: '100%', borderRadius: 7,
               background: 'none', border: 'none', cursor: 'pointer',
-              color: theme.sidebarTextMuted, fontSize: 14, transition: 'all 0.15s',
+              color: theme.sidebarTextMuted, fontSize: 14,
             }}
             onMouseEnter={e => (e.currentTarget.style.color = theme.sidebarText)}
             onMouseLeave={e => (e.currentTarget.style.color = theme.sidebarTextMuted)}
@@ -270,11 +494,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      {/* ── Main ── */}
+      {/* Main */}
       <main style={{
         flex: 1, overflow: 'auto',
-        background: theme.mainBg,
-        color: theme.textPrimary,
+        background: theme.mainBg, color: theme.textPrimary,
       }}>
         {children}
       </main>

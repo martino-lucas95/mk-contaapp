@@ -1,12 +1,24 @@
 <!doctype html>
-<html lang="en">
+<html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#166534" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#2563eb" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="ContaApp" />
+    <meta name="description" content="Sistema de gestión contable" />
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
     <title>ContaApp</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { -webkit-font-smoothing: antialiased; }
+      /* Evitar zoom en inputs iOS */
+      input, select, textarea { font-size: 16px !important; }
+    </style>
   </head>
   <body>
     <div id="root"></div>
